@@ -1,15 +1,15 @@
 import os
-
+import datasets
 import torch
-import torchvision.transforms as transforms
-from PIL import Image
 
 
-def evaluate(model, folder, prefix):
+# from PIL import Image
+
+
+def evaluate(model, folder, prefix,
+             loader=datasets.pil_loader, transform=datasets.img_transforms):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    img_transforms = transforms.Compose([
-        transforms.ToTensor()
-    ])
+
     model = model.to(device)
 
     with open(os.path.join(prefix, folder, "class_labels.txt")) as file_hdl:
@@ -17,12 +17,12 @@ def evaluate(model, folder, prefix):
 
     train_items = []
     for file in train_files:
-        item = img_transforms(Image.open(os.path.join(prefix, file)))
+        item = transform(loader(os.path.join(prefix, file)))
         train_items.append(item)
 
     test_items = []
     for file in test_files:
-        item = img_transforms(Image.open(os.path.join(prefix, file)))
+        item = transform(loader(os.path.join(prefix, file)))
         test_items.append(item)
 
     train_batch = torch.stack(train_items).to(device)  # torch.Size([20, 1, 105, 105])
@@ -33,7 +33,7 @@ def evaluate(model, folder, prefix):
         test_embeds = model(test_batch)
 
     dist_matrix = calc_dist_matrix(train_embeds, test_embeds)
-    preds = torch.argmax(dist_matrix, dim=1)
+    preds = torch.argmin(dist_matrix, dim=1)
     labels = torch.tensor(range(train_batch.size(0)), device=device)
     corrects = torch.sum(preds == labels).item()
     acc = corrects / train_batch.size(0)
