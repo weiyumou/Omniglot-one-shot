@@ -45,14 +45,14 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
 
             running_loss = 0.0
             total = 0
-            for batch in tqdm.tqdm(dataloaders[phase], desc="Batches"):
+            for batch in dataloaders[phase]:
                 anchors, positives, negatives, *_ = \
                     datasets.gen_triplets_from_batch(batch,
                                                      num_classes=num_classes,
                                                      num_samples=num_samples[phase])
-                anchors = torch.chunk(anchors, batch_sizes[phase])
-                positives = torch.chunk(positives, batch_sizes[phase])
-                negatives = torch.chunk(negatives, batch_sizes[phase])
+                anchors = anchors.split(batch_sizes[phase], dim=0)
+                positives = positives.split(batch_sizes[phase], dim=0)
+                negatives = negatives.split(batch_sizes[phase], dim=0)
 
                 for i in range(len(anchors)):
                     anc = anchors[i].to(device)

@@ -64,9 +64,12 @@ if __name__ == '__main__':
                                           num_workers=args.num_workers, pin_memory=True)}
 
     model = models.TripletNet()
-    criterion = nn.TripletMarginLoss()
+    if torch.cuda.device_count() > 1:
+        print("{:d} GPUs are available".format(torch.cuda.device_count()))
+        model = nn.DataParallel(model)
+    criterion = nn.TripletMarginLoss(margin=10)
     optimiser = optim.Adam(model.parameters())
-    batch_sizes = {"train": 2, "val": 2}
+    batch_sizes = {"train": 256, "val": 256}
 
     # batch = next(dataloaders["val"].__iter__())
     #
@@ -79,7 +82,7 @@ if __name__ == '__main__':
     # datasets.display_image(positives[0], train_dataset.indices_to_labels[anc_labels[0].item()])
     # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
     model, model_id = train.train_model(dataloaders, criterion, optimiser,
-                                        args.model_dir, 20, args.num_classes,
+                                        args.model_dir, 300, args.num_classes,
                                         num_samples, batch_sizes, model=model)
     avg_acc = eval.evaluate_all(model, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_acc))
