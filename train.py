@@ -54,7 +54,7 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
                 positives = positives.split(batch_sizes[phase], dim=0)
                 negatives = negatives.split(batch_sizes[phase], dim=0)
 
-                for i in range(len(anchors)):
+                for i in tqdm.tqdm(range(len(anchors)), desc="Triplet Batches"):
                     anc = anchors[i].to(device)
                     pos = positives[i].to(device)
                     neg = negatives[i].to(device)
@@ -72,8 +72,6 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
 
                     running_loss += loss.item() * anc.size(0)
                     total += anc.size(0)
-                    break
-                break
 
             epoch_loss = running_loss / total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
