@@ -29,7 +29,7 @@ def display_image(image_tensor, label=""):
     plt.show()
 
 
-def fetch_train_val(root, train_perct=0.8):
+def fetch_train_val(root, train_perct):
     train_dict = collections.defaultdict(list)
     val_dict = collections.defaultdict(list)
     for alphabet in sorted(os.scandir(root), key=lambda x: x.name):

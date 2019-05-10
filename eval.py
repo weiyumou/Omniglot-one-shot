@@ -3,13 +3,9 @@ import datasets
 import torch
 
 
-# from PIL import Image
-
-
 def evaluate(model, folder, prefix,
              loader=datasets.pil_loader, transform=datasets.img_transforms):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     model = model.to(device)
 
     with open(os.path.join(prefix, folder, "class_labels.txt")) as file_hdl:
@@ -37,17 +33,18 @@ def evaluate(model, folder, prefix,
     labels = torch.tensor(range(train_batch.size(0)), device=device)
     corrects = torch.sum(preds == labels).item()
     acc = corrects / train_batch.size(0)
-    return acc
+    return 1 - acc
 
 
 def evaluate_all(model, num_runs=20, prefix="."):
-    accuracy = 0.0
+    model.eval()
+    error = 0.0
     for run in range(1, num_runs + 1):
         folder = "run" + str(run).zfill(2)
-        acc = evaluate(model, folder, prefix)
-        print("Run #{:d} Acc: {:.4f}".format(run, acc))
-        accuracy += acc
-    return accuracy / num_runs
+        err = evaluate(model, folder, prefix)
+        print("Run #{:d} Error Rate: {:.4f}".format(run, err))
+        error += err
+    return error / num_runs
 
 
 def calc_dist_matrix(train_embeds, test_embeds):
