@@ -9,6 +9,7 @@ import torch.utils.data as data
 import torch.nn as nn
 import torch.optim as optim
 import train
+import losses
 
 
 def parse_args():
@@ -67,7 +68,8 @@ if __name__ == '__main__':
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
-    criterion = nn.TripletMarginLoss(margin=10)
+    # criterion = nn.TripletMarginLoss(margin=10)
+    criterion = losses.SlideLoss()
     optimiser = optim.Adam(model.parameters())
     batch_sizes = {"train": 256, "val": 256}
 
