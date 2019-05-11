@@ -51,6 +51,8 @@ if __name__ == '__main__':
     args = parse_args()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
     model = models.TripletNet()
     if torch.cuda.device_count() > 1:
