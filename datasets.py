@@ -29,7 +29,7 @@ def display_image(image_tensor, label=""):
     plt.show()
 
 
-def fetch_train_val(root, train_perct):
+def load_train_val(root, train_perct):
     train_dict = collections.defaultdict(list)
     val_dict = collections.defaultdict(list)
     for alphabet in sorted(os.scandir(root), key=lambda x: x.name):
@@ -69,6 +69,19 @@ def gen_triplets_from_batch(batch, num_classes, num_samples):
     return anchors, positives, negtives, anc_labels, neg_labels
 
 
+def gen_valset_from_batch(batch, num_classes, num_samples):
+    if num_samples % 2 != 0:
+        raise ValueError("num_samples must be even")
+    images, labels = batch
+    image_clusters = torch.chunk(images, num_classes, dim=0)
+    image_pairs = torch.stack(image_clusters, dim=1)
+    image_batches = torch.chunk(image_pairs, num_samples, dim=0)
+    train_batch = torch.squeeze(torch.cat(image_batches[:len(image_batches) // 2], dim=1), dim=0)
+    test_batch = torch.squeeze(torch.cat(image_batches[len(image_batches) // 2:], dim=1), dim=0)
+    labels = torch.reshape(labels.reshape(-1, num_samples)[:, :num_samples // 2], (-1, ))
+    return train_batch, test_batch, labels
+
+
 class BalancedBatchSampler(data.Sampler):
 
     def __init__(self, indices_dict, num_classes, num_samples, len_dataset) -> None:
@@ -94,7 +107,7 @@ class BalancedBatchSampler(data.Sampler):
                 sel_indices.extend(indices)
                 self.used_indices_count[class_] += self.num_samples
                 if self.used_indices_count[class_] + self.num_samples > len(self.indices_dict[class_]):
-                    np.random.shuffle(self.indices_dict[class_])
+                    random.shuffle(self.indices_dict[class_])
                     self.used_indices_count[class_] = 0
 
             yield sel_indices
@@ -128,7 +141,6 @@ class BasicDataset(data.Dataset):
                 img = self.loader(self.data_dict[label][index - curr_index])
                 if self.transform is not None:
                     img = self.transform(img)
-                # return self.data_dict[label][index - curr_index], label
                 return img, self.labels_to_indices[label]
             curr_index += len(self.data_dict[label])
 

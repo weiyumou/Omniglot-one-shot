@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument("--num_samples", dest='num_samples',
                         help="Number of samples for each class for training", default=20, type=int)
     parser.add_argument("--train_perct", dest='train_perct',
-                        help="Percentage of the data for training", default=0.8, type=float)
+                        help="Percentage of the data for training", default=0.9, type=float)
     parser.add_argument("--num_workers", dest='num_workers',
                         help="Number of workers for Dataloaders", default=2, type=int)
     parser.add_argument("--model_dir", dest='model_dir',
@@ -42,7 +42,17 @@ if __name__ == '__main__':
 
     args = parse_args()
 
-    train_dict, val_dict = datasets.fetch_train_val(args.background_set_root, args.train_perct)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    model = models.TripletNet()
+    if torch.cuda.device_count() > 1:
+        print("{:d} GPUs are available".format(torch.cuda.device_count()))
+        model = nn.DataParallel(model)
+
+    # avg_acc = eval.evaluate_all(device, model, prefix=args.eval_dir, num_runs=1)
+    # print("Average Error Rate: {:.4f}".format(avg_acc))
+
+    train_dict, val_dict = datasets.load_train_val(args.background_set_root, args.train_perct)
     train_dataset = datasets.BasicDataset(train_dict)
     val_dataset = datasets.BasicDataset(val_dict)
 
@@ -64,27 +74,30 @@ if __name__ == '__main__':
                    "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
                                           num_workers=args.num_workers, pin_memory=True)}
 
-    model = models.TripletNet()
-    if torch.cuda.device_count() > 1:
-        print("{:d} GPUs are available".format(torch.cuda.device_count()))
-        model = nn.DataParallel(model)
-    # criterion = nn.TripletMarginLoss(margin=10)
+    # # criterion = nn.TripletMarginLoss(margin=10)
     criterion = losses.SlideLoss()
     optimiser = optim.Adam(model.parameters())
     batch_sizes = {"train": 256, "val": 256}
 
     # batch = next(dataloaders["val"].__iter__())
+    # train_batch, test_batch, labels = datasets.gen_valset_from_batch(batch, args.num_classes, num_samples["val"])
+    # err = eval.evaluate(device, model, train_batch, test_batch)
+    # print(err)
+    # print(train_batch.size())
     #
-    # anchors, positives, negatives, anc_labels, neg_labels = \
-    #     datasets.gen_triplets_from_batch(batch,
-    #                                      num_classes=args.num_classes,
-    #                                      num_samples=num_samples["val"])
-    # print(anchors.size())
-    # datasets.display_image(anchors[0], train_dataset.indices_to_labels[anc_labels[0].item()])
-    # datasets.display_image(positives[0], train_dataset.indices_to_labels[anc_labels[0].item()])
-    # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
-    model, model_id = train.train_model(dataloaders, criterion, optimiser,
+    # datasets.display_image(train_batch[1], val_dataset.indices_to_labels[labels[1].item()])
+    # datasets.display_image(test_batch[1], val_dataset.indices_to_labels[labels[1].item()])
+
+    # # anchors, positives, negatives, anc_labels, neg_labels = \
+    # #     datasets.gen_triplets_from_batch(batch,
+    # #                                      num_classes=args.num_classes,
+    # #                                      num_samples=num_samples["val"])
+    # # print(anchors.size())
+    # # datasets.display_image(anchors[0], train_dataset.indices_to_labels[anc_labels[0].item()])
+    # # datasets.display_image(positives[0], train_dataset.indices_to_labels[anc_labels[0].item()])
+    # # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
+    model, model_id = train.train_model(device, dataloaders, criterion, optimiser,
                                         args.model_dir, 300, args.num_classes,
                                         num_samples, batch_sizes, model=model)
-    avg_acc = eval.evaluate_all(model, prefix=args.eval_dir)
-    print("Average Error Rate: {:.4f}".format(avg_acc))
+    avg_err = eval.evaluate_all(device, model, prefix=args.eval_dir)
+    print("Average Error Rate: {:.4f}".format(avg_err))

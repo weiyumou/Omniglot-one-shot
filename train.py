@@ -5,13 +5,14 @@ import os
 import tqdm
 import math
 import datasets
+import eval
 
 
-def train_model(dataloaders, criterion, optimiser, model_dir,
+def train_model(device, dataloaders, criterion, optimiser, model_dir,
                 num_epochs, num_classes, num_samples,
                 batch_sizes, model_id=None, model=None):
     last_epoch = 0
-    best_val_loss = math.inf
+    best_val_err = math.inf
 
     if model_id is None and model is not None:
         model_id = str(int(time.time()))
@@ -23,11 +24,10 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
         model.load_state_dict(checkpoint['model_state_dict'])
         optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
         last_epoch = checkpoint['epoch']
-        best_val_loss = checkpoint["best_val_loss"]
+        best_val_err = checkpoint["best_val_err"]
     else:
         raise ValueError("Invalid model_id or model")
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     since = time.time()
@@ -44,7 +44,9 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
                 model.eval()
 
             running_loss = 0.0
-            total = 0
+            loss_total = 0
+            running_err = 0.0
+            err_total = 0
             for batch in dataloaders[phase]:
                 anchors, positives, negatives, *_ = \
                     datasets.gen_triplets_from_batch(batch,
@@ -71,23 +73,33 @@ def train_model(dataloaders, criterion, optimiser, model_dir,
                         optimiser.step()
 
                     running_loss += loss.item() * anc.size(0)
-                    total += anc.size(0)
+                    loss_total += anc.size(0)
 
-            epoch_loss = running_loss / total
+                if phase == "val":
+                    train_batch, test_batch, _ = \
+                        datasets.gen_valset_from_batch(batch, num_classes, num_samples["val"])
+                    err = eval.evaluate(device, model, train_batch, test_batch)
+                    running_err += err
+                err_total += 1
+            epoch_loss = running_loss / loss_total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
 
-            if phase == "val" and epoch_loss < best_val_loss:
-                best_val_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+            if phase == "val":
+                epoch_err = running_err / err_total
+                print("{} Error: {:.4f}".format(phase, epoch_err))
+
+                if epoch_err < best_val_err:
+                    best_val_err = epoch_err
+                    best_model_wts = copy.deepcopy(model.state_dict())
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
-    print('Best val Loss: {:4f}'.format(best_val_loss))
+    print('Best val Error: {:4f}'.format(best_val_err))
     model.load_state_dict(best_model_wts)
     checkpoint = {"model_state_dict": model.state_dict(),
                   "optimiser_state_dict": optimiser.state_dict(),
                   "epoch": last_epoch + num_epochs,
-                  "best_val_loss": best_val_loss}
+                  "best_val_err": best_val_err}
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
     return model, model_id

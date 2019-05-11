@@ -6,7 +6,7 @@ class TripletNet(nn.Module):
         super().__init__()
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=64,
-                      kernel_size=7, padding=3, bias=False),
+                      kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(num_features=64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
@@ -19,20 +19,20 @@ class TripletNet(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=128,
+            nn.Conv2d(in_channels=64, out_channels=64,
                       kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=128),
+            nn.BatchNorm2d(num_features=64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=128,
+            nn.Conv2d(in_channels=64, out_channels=64,
                       kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=128),
+            nn.BatchNorm2d(num_features=64),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),  # (N, 128, 6, 6)
+            nn.MaxPool2d(kernel_size=2),  # (N, 64, 6, 6)
         )
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # (N, 128, 1, 1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # (N, 64, 1, 1)
         # self.fc = nn.Linear(in_features=64*6*6, out_features=128)
 
     def forward(self, x):
