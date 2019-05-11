@@ -143,6 +143,7 @@ class BasicDataset(data.Dataset):
                     img = self.transform(img)
                 return img, self.labels_to_indices[label]
             curr_index += len(self.data_dict[label])
+        raise IndexError("Out of Index")
 
     def __len__(self) -> int:
         return sum((len(self.data_dict[label]) for label in self.data_dict))

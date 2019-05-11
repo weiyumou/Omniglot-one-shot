@@ -29,6 +29,12 @@ def parse_args():
                         help="Directory to save checkpoints", default="checkpoints", type=str)
     parser.add_argument("--eval_dir", dest='eval_dir',
                         help="Directory where evaluation data is stored", default="all_runs", type=str)
+    parser.add_argument("--batch_size_train", dest='batch_size_train',
+                        help="Batch size for training", default=256, type=int)
+    parser.add_argument("--batch_size_val", dest='batch_size_val',
+                        help="Batch size for validation", default=256, type=int)
+    parser.add_argument("--num_epochs", dest='num_epochs',
+                        help="Number of epochs to run", default=200, type=int)
     return parser.parse_args()
 
 
@@ -48,9 +54,6 @@ if __name__ == '__main__':
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
-
-    # avg_acc = eval.evaluate_all(device, model, prefix=args.eval_dir, num_runs=1)
-    # print("Average Error Rate: {:.4f}".format(avg_acc))
 
     train_dict, val_dict = datasets.load_train_val(args.background_set_root, args.train_perct)
     train_dataset = datasets.BasicDataset(train_dict)
@@ -77,7 +80,7 @@ if __name__ == '__main__':
     # # criterion = nn.TripletMarginLoss(margin=10)
     criterion = losses.SlideLoss()
     optimiser = optim.Adam(model.parameters())
-    batch_sizes = {"train": 256, "val": 256}
+    batch_sizes = {"train": args.batch_size_train, "val": args.batch_size_val}
 
     # batch = next(dataloaders["val"].__iter__())
     # train_batch, test_batch, labels = datasets.gen_valset_from_batch(batch, args.num_classes, num_samples["val"])
@@ -97,7 +100,7 @@ if __name__ == '__main__':
     # # datasets.display_image(positives[0], train_dataset.indices_to_labels[anc_labels[0].item()])
     # # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
     model, model_id = train.train_model(device, dataloaders, criterion, optimiser,
-                                        args.model_dir, 300, args.num_classes,
-                                        num_samples, batch_sizes, model=model)
+                                        args.model_dir, args.num_epochs, args.num_classes,
+                                        num_samples, batch_sizes, model)
     avg_err = eval.evaluate_all(device, model, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))

@@ -10,31 +10,27 @@ import eval
 
 def train_model(device, dataloaders, criterion, optimiser, model_dir,
                 num_epochs, num_classes, num_samples,
-                batch_sizes, model_id=None, model=None):
+                batch_sizes, model, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
 
-    if model_id is None and model is not None:
+    if model_id is None:
         model_id = str(int(time.time()))
         save_path = os.path.join(model_dir, model_id)
         os.makedirs(save_path, exist_ok=True)
-    elif model_id is not None and model is None:
+    else:
         save_path = os.path.join(model_dir, model_id)
         checkpoint = torch.load(os.path.join(save_path, model_id + ".pt"))
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimiser.load_state_dict(checkpoint['optimiser_state_dict'])
-        last_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimiser.load_state_dict(checkpoint["optimiser_state_dict"])
+        last_epoch = checkpoint["last_epoch"]
         best_val_err = checkpoint["best_val_err"]
-    else:
-        raise ValueError("Invalid model_id or model")
 
     model = model.to(device)
-
-    since = time.time()
     best_model_wts = copy.deepcopy(model.state_dict())
-
+    since = time.time()
     for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch + last_epoch, num_epochs - 1))
+        print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
         print('-' * 10)
 
         for phase in ["train", "val"]:
@@ -56,31 +52,33 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
                 positives = positives.split(batch_sizes[phase], dim=0)
                 negatives = negatives.split(batch_sizes[phase], dim=0)
 
+                if phase == "val":
+                    train_batch, test_batch, _ = \
+                        datasets.gen_valset_from_batch(batch, num_classes, num_samples[phase])
+
                 for i in tqdm.tqdm(range(len(anchors)), desc="Triplet Batches"):
                     anc = anchors[i].to(device)
                     pos = positives[i].to(device)
                     neg = negatives[i].to(device)
 
                     with torch.set_grad_enabled(phase == "train"):
-                        anc_outs = model(anc)
-                        pos_outs = model(pos)
-                        neg_outs = model(neg)
-                        loss = criterion(anc_outs, pos_outs, neg_outs)
+                        anc_out = model(anc)
+                        pos_out = model(pos)
+                        neg_out = model(neg)
+                        loss = criterion(anc_out, pos_out, neg_out)
 
                     if phase == "train":
                         optimiser.zero_grad()
                         loss.backward()
                         optimiser.step()
+                    else:
+                        err = eval.evaluate(device, model, train_batch, test_batch)
+                        running_err += err
+                        err_total += 1
 
                     running_loss += loss.item() * anc.size(0)
                     loss_total += anc.size(0)
 
-                if phase == "val":
-                    train_batch, test_batch, _ = \
-                        datasets.gen_valset_from_batch(batch, num_classes, num_samples["val"])
-                    err = eval.evaluate(device, model, train_batch, test_batch)
-                    running_err += err
-                err_total += 1
             epoch_loss = running_loss / loss_total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
 
@@ -99,7 +97,7 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
     model.load_state_dict(best_model_wts)
     checkpoint = {"model_state_dict": model.state_dict(),
                   "optimiser_state_dict": optimiser.state_dict(),
-                  "epoch": last_epoch + num_epochs,
+                  "last_epoch": last_epoch + num_epochs,
                   "best_val_err": best_val_err}
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
     return model, model_id
