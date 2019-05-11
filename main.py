@@ -35,6 +35,8 @@ def parse_args():
                         help="Batch size for validation", default=256, type=int)
     parser.add_argument("--num_epochs", dest='num_epochs',
                         help="Number of epochs to run", default=200, type=int)
+    parser.add_argument("--model_id", dest='model_id',
+                        help="Specific model to train", default=None, type=str)
     return parser.parse_args()
 
 
@@ -42,7 +44,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
     torch.cuda.manual_seed(0)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.benchmark = False
     np.random.seed(0)
     random.seed(0)
 
@@ -101,6 +103,6 @@ if __name__ == '__main__':
     # # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
     model, model_id = train.train_model(device, dataloaders, criterion, optimiser,
                                         args.model_dir, args.num_epochs, args.num_classes,
-                                        num_samples, batch_sizes, model)
+                                        num_samples, batch_sizes, model, model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))
