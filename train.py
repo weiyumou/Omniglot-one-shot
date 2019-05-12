@@ -6,11 +6,13 @@ import tqdm
 import math
 import datasets
 import eval
+# import torch.utils.tensorboard as tensorboard
+import torchvision
 
 
 def train_model(device, dataloaders, criterion, optimiser, model_dir,
                 num_epochs, num_classes, num_samples,
-                batch_sizes, model, model_id=None):
+                batch_sizes, log_dir, model, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
 
@@ -28,6 +30,8 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
 
     model = model.to(device)
     best_model_wts = copy.deepcopy(model.state_dict())
+    best_opt_params = copy.deepcopy(optimiser.state_dict())
+    # writer = tensorboard.SummaryWriter(log_dir)
     since = time.time()
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
@@ -57,9 +61,17 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
                         datasets.gen_valset_from_batch(batch, num_classes, num_samples[phase])
 
                 for i in tqdm.tqdm(range(len(anchors)), desc="Triplet Batches"):
+                    # grid = torchvision.utils.make_grid(anchors[i][:5])
+                    # writer.add_image("Images", grid, 0)
+                    # writer.add_graph(model, anchors[i])
+
                     anc = anchors[i].to(device)
                     pos = positives[i].to(device)
                     neg = negatives[i].to(device)
+
+                    # if i == 0:
+                    #     img_grid = torchvision.utils.make_grid([anc[0], pos[0], neg[0]])
+                    #     datasets.display_image(img_grid)
 
                     with torch.set_grad_enabled(phase == "train"):
                         anc_out = model(anc)
@@ -89,15 +101,18 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
                 if epoch_err < best_val_err:
                     best_val_err = epoch_err
                     best_model_wts = copy.deepcopy(model.state_dict())
+                    best_opt_params = copy.deepcopy(optimiser.state_dict())
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Error: {:4f}'.format(best_val_err))
     model.load_state_dict(best_model_wts)
+    optimiser.load_state_dict(best_opt_params)
     checkpoint = {"model_state_dict": model.state_dict(),
                   "optimiser_state_dict": optimiser.state_dict(),
                   "last_epoch": last_epoch + num_epochs,
                   "best_val_err": best_val_err}
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
+    # writer.close()
     return model, model_id
