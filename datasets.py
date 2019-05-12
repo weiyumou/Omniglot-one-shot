@@ -12,6 +12,7 @@ import torch
 import itertools
 
 img_transforms = transforms.Compose([
+    transforms.Resize(28),
     transforms.ToTensor()
 ])
 
