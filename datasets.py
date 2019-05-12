@@ -1,15 +1,15 @@
 import collections
+import itertools
 import os
 import random
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import torch.utils.data as data
+import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
-
-import torch
-import itertools
 
 img_transforms = transforms.Compose([
     transforms.Resize(28),
@@ -28,6 +28,12 @@ def display_image(image_tensor, label=""):
     plt.yticks(())
     plt.text(2, 5, label)
     plt.show()
+
+
+def visualise_triplet(anc, pos, neg, labels):
+    labels = ", ".join(labels)
+    grid = torchvision.utils.make_grid([anc, pos, neg])
+    display_image(grid, labels)
 
 
 def load_train_val(root, train_perct):
@@ -79,7 +85,7 @@ def gen_valset_from_batch(batch, num_classes, num_samples):
     image_batches = torch.chunk(image_pairs, num_samples, dim=0)
     train_batch = torch.squeeze(torch.cat(image_batches[:len(image_batches) // 2], dim=1), dim=0)
     test_batch = torch.squeeze(torch.cat(image_batches[len(image_batches) // 2:], dim=1), dim=0)
-    labels = torch.reshape(labels.reshape(-1, num_samples)[:, :num_samples // 2], (-1, ))
+    labels = torch.reshape(labels.reshape(-1, num_samples)[:, :num_samples // 2], (-1,))
     return train_batch, test_batch, labels
 
 
@@ -148,3 +154,66 @@ class BasicDataset(data.Dataset):
 
     def __len__(self) -> int:
         return sum((len(self.data_dict[label]) for label in self.data_dict))
+
+
+class TripletSampler(data.Sampler):
+    def __init__(self, data_source, shuffle=False) -> None:
+        super().__init__(data_source)
+        self.indices_dict = data_source.indices_dict
+        self.classes = list(self.indices_dict.keys())
+        self.shuffle = shuffle
+
+    def __iter__(self):
+        if self.shuffle:
+            random.shuffle(self.classes)
+        self.curr_class_idx = 0
+        self.curr_class_iter = iter(itertools.combinations(
+            self.indices_dict[self.classes[self.curr_class_idx]], 2))
+        return self
+
+    def __len__(self) -> int:
+        return sum(len(self.indices_dict[x]) *
+                   (len(self.indices_dict[x]) - 1) // 2
+                   for x in self.indices_dict)
+
+    def __next__(self):
+        try:
+            anc_pos_pair = next(self.curr_class_iter)
+        except StopIteration:
+            if self.shuffle:
+                random.shuffle(self.indices_dict[self.classes[self.curr_class_idx]])
+            self.curr_class_idx += 1
+            if self.curr_class_idx >= len(self.classes):
+                raise StopIteration
+            self.curr_class_iter = iter(itertools.combinations(
+                self.indices_dict[self.classes[self.curr_class_idx]], 2))
+            anc_pos_pair = next(self.curr_class_iter)
+
+        neg_class = random.choice(self.classes)
+        while neg_class == self.classes[self.curr_class_idx]:
+            neg_class = random.choice(self.classes)
+        neg = random.choice(self.indices_dict[neg_class])
+        return anc_pos_pair + (neg,)
+
+
+class TripletBatchSampler(data.BatchSampler):
+    def __init__(self, sampler, batch_size, drop_last=False) -> None:
+        if batch_size % 3 != 0:
+            raise ValueError("batch_size must be a multiple of 3!")
+        super().__init__(sampler, batch_size, drop_last)
+
+    def __iter__(self):
+        batch = []
+        for indices in self.sampler:
+            batch.extend(indices)
+            if len(batch) == self.batch_size:
+                yield batch
+                batch = []
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+
+    def __len__(self) -> int:
+        if self.drop_last:
+            return 3 * len(self.sampler) // self.batch_size
+        else:
+            return (3 * len(self.sampler) + self.batch_size - 1) // self.batch_size

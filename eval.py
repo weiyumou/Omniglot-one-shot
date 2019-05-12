@@ -3,27 +3,42 @@ import datasets
 import torch
 
 
-def evaluate(device, model, train_data, test_data, batch_size=20):
-    train_batches = torch.split(train_data, batch_size)
-    test_batches = torch.split(test_data, batch_size)
+# def evaluate(device, model, train_data, test_data, batch_size=20):
+#     train_batches = torch.split(train_data, batch_size)
+#     test_batches = torch.split(test_data, batch_size)
+#
+#     error = 0.0
+#     for i in range(len(train_batches)):
+#         train_batch = train_batches[i].to(device)
+#         test_batch = test_batches[i].to(device)
+#
+#         assert not model.training
+#         with torch.no_grad():
+#             train_embeds = model(train_batch)
+#             test_embeds = model(test_batch)
+#
+#         dist_matrix = calc_dist_matrix(train_embeds, test_embeds)
+#         preds = torch.argmin(dist_matrix, dim=1)
+#         labels = torch.tensor(range(train_batch.size(0)), device=device)
+#         corrects = torch.sum(preds == labels).item()
+#         acc = corrects / train_batch.size(0)
+#         error += 1 - acc
+#     return error / len(train_batches)
 
-    error = 0.0
-    for i in range(len(train_batches)):
-        train_batch = train_batches[i].to(device)
-        test_batch = test_batches[i].to(device)
+def evaluate(device, model, train_batch, test_batch):
+    train_batch = train_batch.to(device)
+    test_batch = test_batch.to(device)
+    assert not model.training
+    with torch.no_grad():
+        train_embeds = model(train_batch)
+        test_embeds = model(test_batch)
 
-        assert not model.training
-        with torch.no_grad():
-            train_embeds = model(train_batch)
-            test_embeds = model(test_batch)
-
-        dist_matrix = calc_dist_matrix(train_embeds, test_embeds)
-        preds = torch.argmin(dist_matrix, dim=1)
-        labels = torch.tensor(range(train_batch.size(0)), device=device)
-        corrects = torch.sum(preds == labels).item()
-        acc = corrects / train_batch.size(0)
-        error += 1 - acc
-    return error / len(train_batches)
+    dist_matrix = calc_dist_matrix(train_embeds, test_embeds)
+    preds = torch.argmin(dist_matrix, dim=1)
+    labels = torch.tensor(range(train_batch.size(0)), device=device)
+    corrects = torch.sum(preds == labels).item()
+    acc = corrects / train_batch.size(0)
+    return 1 - acc
 
 
 def load_eval_images(folder, prefix, loader=datasets.pil_loader,
@@ -47,7 +62,7 @@ def load_eval_images(folder, prefix, loader=datasets.pil_loader,
     return train_batch, test_batch
 
 
-def evaluate_all(device, model, model_id=None, model_dir=None, num_runs=20, prefix="."):
+def evaluate_all(device, model, num_runs, model_id=None, model_dir=None, prefix="."):
     if model_id is not None and model_dir is not None:
         model = torch.nn.DataParallel(model)
         save_path = os.path.join(model_dir, model_id)
@@ -55,12 +70,10 @@ def evaluate_all(device, model, model_id=None, model_dir=None, num_runs=20, pref
                                 map_location=lambda storage, loc: storage)
         model.load_state_dict(checkpoint['model_state_dict'])
 
-    model = model.to(device)
     model.eval()
-
     error = 0.0
-    for run in range(1, num_runs + 1):
-        folder = "run" + str(run).zfill(2)
+    for run in range(num_runs):
+        folder = "run" + str(run + 1).zfill(2)
         train_batch, test_batch = load_eval_images(folder, prefix)
         err = evaluate(device, model, train_batch, test_batch)
         print("Run #{:d} Error Rate: {:.4f}".format(run, err))

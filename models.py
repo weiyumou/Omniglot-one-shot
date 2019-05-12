@@ -19,9 +19,9 @@ class TripletNet(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64,
+            nn.Conv2d(in_channels=64, out_channels=128,
                       kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=64),
+            nn.BatchNorm2d(num_features=128),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )

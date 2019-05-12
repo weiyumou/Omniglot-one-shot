@@ -7,7 +7,6 @@ import math
 import datasets
 import eval
 # import torch.utils.tensorboard as tensorboard
-import torchvision
 
 
 def train_model(device, dataloaders, criterion, optimiser, model_dir,
@@ -115,4 +114,101 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
                   "best_val_err": best_val_err}
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
     # writer.close()
+    return model, model_id
+
+
+def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
+                        criterion, optimiser, model_dir,
+                        num_epochs, num_eval_runs,
+                        batch_sizes, model, model_id=None):
+    last_epoch = 0
+    best_val_err = math.inf
+
+    if model_id is None:
+        model_id = str(int(time.time()))
+        save_path = os.path.join(model_dir, model_id)
+        os.makedirs(save_path, exist_ok=True)
+    else:
+        save_path = os.path.join(model_dir, model_id)
+        checkpoint = torch.load(os.path.join(save_path, model_id + ".pt"))
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimiser.load_state_dict(checkpoint["optimiser_state_dict"])
+        last_epoch = checkpoint["last_epoch"]
+        best_val_err = checkpoint["best_val_err"]
+
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_opt_params = copy.deepcopy(optimiser.state_dict())
+    since = time.time()
+    for epoch in range(num_epochs):
+        print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
+        print('-' * 10)
+
+        for phase in ["train", "val"]:
+            if phase == "train":
+                model.train()
+            else:
+                model.eval()
+
+            running_loss = 0.0
+            loss_total = 0
+            for triplet_batch, triplet_labels in tqdm.tqdm(triplet_dataloaders[phase], desc="Triplet Batches"):
+                triplet_batch = torch.reshape(triplet_batch, (batch_sizes[phase], 3, *triplet_batch.size()[1:]))
+                triplet_labels = torch.reshape(triplet_labels, (batch_sizes[phase], 3))
+                anchors, positives, negatives = \
+                    (torch.squeeze(x, dim=1) for x in torch.chunk(triplet_batch, 3, dim=1))
+                anc_labels, pos_labels, neg_labels = \
+                    (torch.squeeze(x, dim=1) for x in torch.chunk(triplet_labels, 3, dim=1))
+
+                anchors = anchors.to(device)
+                positives = positives.to(device)
+                negatives = negatives.to(device)
+
+                with torch.set_grad_enabled(phase == "train"):
+                    anc_out = model(anchors)
+                    pos_out = model(positives)
+                    neg_out = model(negatives)
+                    loss = criterion(anc_out, pos_out, neg_out)
+
+                if phase == "train":
+                    optimiser.zero_grad()
+                    loss.backward()
+                    # optimiser.step()
+
+                running_loss += loss.item() * anc_labels.size(0)
+                loss_total += anc_labels.size(0)
+
+            epoch_loss = running_loss / loss_total
+            print("{} Loss: {:.4f}".format(phase, epoch_loss))
+
+            if phase == "val":
+                running_err = 0.0
+                err_total = 0
+                for pair_batch, pair_labels in pair_dataloaders[phase]:
+                    pair_batch = torch.reshape(pair_batch, (num_eval_runs, 2, *pair_batch.size()[1:]))
+                    pair_labels = torch.reshape(pair_labels, (num_eval_runs, -1))
+                    train_batch, test_batch = (torch.squeeze(x, dim=1) for x in torch.chunk(pair_batch, 2, dim=1))
+                    train_labels, test_labels = (torch.squeeze(x, dim=1) for x in torch.chunk(pair_labels, 2, dim=1))
+                    err = eval.evaluate(device, model, train_batch, test_batch)
+                    running_err += err
+                    err_total += 1
+
+                epoch_err = running_err / err_total
+                print("{} Error: {:.4f}".format(phase, epoch_err))
+
+                if epoch_err < best_val_err:
+                    best_val_err = epoch_err
+                    best_model_wts = copy.deepcopy(model.state_dict())
+                    best_opt_params = copy.deepcopy(optimiser.state_dict())
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(
+        time_elapsed // 60, time_elapsed % 60))
+    print('Best val Error: {:4f}'.format(best_val_err))
+    model.load_state_dict(best_model_wts)
+    optimiser.load_state_dict(best_opt_params)
+    checkpoint = {"model_state_dict": model.state_dict(),
+                  "optimiser_state_dict": optimiser.state_dict(),
+                  "last_epoch": last_epoch + num_epochs,
+                  "best_val_err": best_val_err}
+    torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
     return model, model_id
