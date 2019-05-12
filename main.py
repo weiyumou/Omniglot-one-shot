@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import train
 import losses
+import matplotlib.pyplot as plt
 
 
 def parse_args():
@@ -58,8 +59,6 @@ if __name__ == '__main__':
         random.seed(0)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # if torch.cuda.is_available():
-    #     torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
     model = models.TripletNet().to(device)
     if torch.cuda.device_count() > 1:
@@ -148,8 +147,26 @@ if __name__ == '__main__':
     # # datasets.display_image(anchors[0], train_dataset.indices_to_labels[anc_labels[0].item()])
     # # datasets.display_image(positives[0], train_dataset.indices_to_labels[anc_labels[0].item()])
     # # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
-    model, model_id = train.train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
-                                                criterion, optimiser, args.model_dir,
-                                                args.num_epochs, model, model_id=args.model_id)
+    model, model_id, checkpoint = train.train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
+                                                            criterion, optimiser, args.model_dir,
+                                                            args.num_epochs, model, model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model, args.num_eval_runs, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))
+
+    for phase in checkpoint["epoch_losses"]:
+        epoch_losses = checkpoint["epoch_losses"][phase]
+        plt.figure()
+        plt.plot(range(len(epoch_losses)), epoch_losses)
+        plt.title("Epoch Losses for {}".format(phase))
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+
+    for phase in checkpoint["epoch_errors"]:
+        epoch_errors = checkpoint["epoch_errors"][phase]
+        plt.figure()
+        plt.plot(range(len(epoch_errors)), epoch_errors)
+        plt.title("Epoch Errors for {}".format(phase))
+        plt.xlabel("Epoch")
+        plt.ylabel("Error")
+
+    plt.show()

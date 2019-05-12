@@ -6,6 +6,7 @@ import tqdm
 import math
 import datasets
 import eval
+import collections
 # import torch.utils.tensorboard as tensorboard
 
 
@@ -122,6 +123,8 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                         num_epochs, model, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
+    epoch_losses = collections.defaultdict(list)
+    epoch_errors = collections.defaultdict(list)
 
     if model_id is None:
         model_id = str(int(time.time()))
@@ -134,6 +137,8 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
         optimiser.load_state_dict(checkpoint["optimiser_state_dict"])
         last_epoch = checkpoint["last_epoch"]
         best_val_err = checkpoint["best_val_err"]
+        epoch_losses = checkpoint["epoch_losses"]
+        epoch_errors = checkpoint["epoch_errors"]
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_opt_params = copy.deepcopy(optimiser.state_dict())
@@ -178,6 +183,7 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
 
             epoch_loss = running_loss / loss_total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
+            epoch_losses[phase].append(epoch_loss)
 
             if phase == "val":
                 running_err = 0.0
@@ -193,6 +199,7 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
 
                 epoch_err = running_err / err_total
                 print("{} Error: {:.4f}".format(phase, epoch_err))
+                epoch_errors[phase].append(epoch_err)
 
                 if epoch_err < best_val_err:
                     best_val_err = epoch_err
@@ -208,6 +215,8 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
     checkpoint = {"model_state_dict": model.state_dict(),
                   "optimiser_state_dict": optimiser.state_dict(),
                   "last_epoch": last_epoch + num_epochs,
-                  "best_val_err": best_val_err}
+                  "best_val_err": best_val_err,
+                  "epoch_losses": epoch_losses,
+                  "epoch_errors": epoch_errors}
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
-    return model, model_id
+    return model, model_id, checkpoint
