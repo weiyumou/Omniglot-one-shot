@@ -71,15 +71,17 @@ if __name__ == '__main__':
                                                         num_samples=num_samples["train"],
                                                         len_dataset=len(train_dataset))
 
-    val_batch_sampler = datasets.BalancedBatchSampler(val_dataset.indices_dict,
-                                                      num_classes=args.num_classes,
-                                                      num_samples=num_samples["val"],
-                                                      len_dataset=len(val_dataset))
+    # val_batch_sampler = datasets.BalancedBatchSampler(val_dataset.indices_dict,
+    #                                                   num_classes=args.num_classes,
+    #                                                   num_samples=num_samples["val"],
+    #                                                   len_dataset=len(val_dataset))
 
     dataloaders = {"train": data.DataLoader(train_dataset, batch_sampler=train_batch_sampler,
                                             num_workers=args.num_workers, pin_memory=True),
-                   "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
+                   "val": data.DataLoader(val_dataset, shuffle=False, batch_size=args.num_classes * num_samples["val"],
                                           num_workers=args.num_workers, pin_memory=True)}
+    # "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
+    #                        num_workers=args.num_workers, pin_memory=True)}
 
     # # criterion = nn.TripletMarginLoss(margin=10)
     criterion = losses.SlideLoss()
