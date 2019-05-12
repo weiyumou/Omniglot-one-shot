@@ -150,7 +150,6 @@ if __name__ == '__main__':
     # # datasets.display_image(negatives[0], train_dataset.indices_to_labels[neg_labels[0].item()])
     model, model_id = train.train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                                                 criterion, optimiser, args.model_dir,
-                                                args.num_epochs, args.num_eval_runs,
-                                                batch_sizes, model, model_id=args.model_id)
+                                                args.num_epochs, model, model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model, args.num_eval_runs, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))

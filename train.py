@@ -119,8 +119,7 @@ def train_model(device, dataloaders, criterion, optimiser, model_dir,
 
 def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                         criterion, optimiser, model_dir,
-                        num_epochs, num_eval_runs,
-                        batch_sizes, model, model_id=None):
+                        num_epochs, model, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
 
@@ -152,8 +151,8 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
             running_loss = 0.0
             loss_total = 0
             for triplet_batch, triplet_labels in tqdm.tqdm(triplet_dataloaders[phase], desc="Triplet Batches"):
-                triplet_batch = torch.reshape(triplet_batch, (batch_sizes[phase], 3, *triplet_batch.size()[1:]))
-                triplet_labels = torch.reshape(triplet_labels, (batch_sizes[phase], 3))
+                triplet_batch = torch.reshape(triplet_batch, (-1, 3, *triplet_batch.size()[1:]))
+                triplet_labels = torch.reshape(triplet_labels, (-1, 3))
                 anchors, positives, negatives = \
                     (torch.squeeze(x, dim=1) for x in torch.chunk(triplet_batch, 3, dim=1))
                 anc_labels, pos_labels, neg_labels = \
@@ -172,7 +171,7 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                 if phase == "train":
                     optimiser.zero_grad()
                     loss.backward()
-                    # optimiser.step()
+                    optimiser.step()
 
                 running_loss += loss.item() * anc_labels.size(0)
                 loss_total += anc_labels.size(0)
@@ -184,8 +183,8 @@ def train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                 running_err = 0.0
                 err_total = 0
                 for pair_batch, pair_labels in pair_dataloaders[phase]:
-                    pair_batch = torch.reshape(pair_batch, (num_eval_runs, 2, *pair_batch.size()[1:]))
-                    pair_labels = torch.reshape(pair_labels, (num_eval_runs, -1))
+                    pair_batch = torch.reshape(pair_batch, (-1, 2, *pair_batch.size()[1:]))
+                    pair_labels = torch.reshape(pair_labels, (-1, 2))
                     train_batch, test_batch = (torch.squeeze(x, dim=1) for x in torch.chunk(pair_batch, 2, dim=1))
                     train_labels, test_labels = (torch.squeeze(x, dim=1) for x in torch.chunk(pair_labels, 2, dim=1))
                     err = eval.evaluate(device, model, train_batch, test_batch)
