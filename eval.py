@@ -25,7 +25,8 @@ import torch
 #         error += 1 - acc
 #     return error / len(train_batches)
 
-def triplet_evaluate(device, model, train_batch, test_batch):
+def triplet_evaluate(device, model_dict, train_batch, test_batch):
+    model = model_dict["triplet"]
     train_batch = train_batch.to(device)
     test_batch = test_batch.to(device)
     assert not model.training
@@ -41,13 +42,18 @@ def triplet_evaluate(device, model, train_batch, test_batch):
     return 1 - acc
 
 
-def metric_evaluate(device, model, train_batch, test_batch):
+def metric_evaluate(device, model_dict, train_batch, test_batch):
+    triplet_model = model_dict["triplet"]
+    metric_model = model_dict["metric"]
+
     train_batch = train_batch.to(device)
     test_batch = test_batch.to(device)
-    concat_batch = torch.cat([torch.cat((train_batch, test_batch[i].expand_as(train_batch)), dim=1)
-                              for i in range(test_batch.size(0))], dim=0)
     with torch.no_grad():
-        dist_matrix = model(concat_batch)
+        train_batch = triplet_model(train_batch)
+        test_batch = triplet_model(test_batch)
+        concat_batch = torch.cat([torch.cat((train_batch, test_batch[i].expand_as(train_batch)), dim=1)
+                                  for i in range(test_batch.size(0))], dim=0)
+        dist_matrix = metric_model(concat_batch)
 
     dist_matrix = dist_matrix.reshape(-1, train_batch.size(0))
     preds = torch.argmin(dist_matrix, dim=1)
@@ -78,21 +84,23 @@ def load_eval_images(folder, prefix, loader=datasets.pil_loader,
     return train_batch, test_batch
 
 
-def evaluate_all(device, model, eval_forward, model_id=None,
+def evaluate_all(device, model_dict, eval_forward, model_id=None,
                  model_dir=None, num_runs=20, prefix="."):
     if model_id is not None and model_dir is not None:
-        model = torch.nn.DataParallel(model)
+        # model = torch.nn.DataParallel(model)
         save_path = os.path.join(model_dir, model_id)
         checkpoint = torch.load(os.path.join(save_path, model_id + ".pt"),
                                 map_location=lambda storage, loc: storage)
-        model.load_state_dict(checkpoint['model_state_dict'])
+        for model_name in model_dict:
+            model_dict[model_name].load_state_dict(checkpoint[model_name + '_model_state_dict'])
 
-    model.eval()
+    for model_name in model_dict:
+        model_dict[model_name].eval()
     error = 0.0
     for run in range(num_runs):
         folder = "run" + str(run + 1).zfill(2)
         train_batch, test_batch = load_eval_images(folder, prefix)
-        err = eval_forward(device, model, train_batch, test_batch)
+        err = eval_forward(device, model_dict, train_batch, test_batch)
         print("Run #{:d} Error Rate: {:.4f}".format(run, err))
         error += err
     return error / num_runs

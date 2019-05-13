@@ -58,11 +58,18 @@ if __name__ == '__main__':
 
     # model = models.TripletNet().to(device)
     # model = models.TripletNetWithFC().to(device)
-    model = models.MetricNet().to(device)
+    # model = models.MetricNet().to(device)
+    model_dict = {"triplet": models.TripletNetWithFC().to(device),
+                  "metric": models.MetricNet().to(device)}
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
-        model = nn.DataParallel(model)
+        for model_name in model_dict:
+            model_dict[model_name] = nn.DataParallel(model_dict[model_name])
+
+    optimiser_dict = dict()
+    for model_name in model_dict:
+        optimiser_dict[model_name] = optim.Adam(model_dict[model_name].parameters())
 
     train_dict, val_dict = datasets.load_train_val(args.background_set_root, args.train_perct)
     train_dataset = datasets.BasicDataset(train_dict)
@@ -86,13 +93,13 @@ if __name__ == '__main__':
                                                pin_memory=True, drop_last=True)}
 
     criterion = losses.SlideLoss()
-    optimiser = optim.Adam(model.parameters())
+    # optimiser = optim.Adam(model.parameters())
 
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
-                                                    criterion, optimiser, args.model_dir,
-                                                    args.num_epochs, model, train.metric_model_forward,
+                                                    criterion, optimiser_dict, args.model_dir,
+                                                    args.num_epochs, model_dict, train.metric_model_forward,
                                                     eval.metric_evaluate, model_id=args.model_id)
-    avg_err = eval.evaluate_all(device, model, eval.metric_evaluate, prefix=args.eval_dir,
+    avg_err = eval.evaluate_all(device, model_dict, eval.metric_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))
 
