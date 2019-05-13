@@ -62,7 +62,7 @@ def load_eval_images(folder, prefix, loader=datasets.pil_loader,
     return train_batch, test_batch
 
 
-def evaluate_all(device, model, num_runs, model_id=None, model_dir=None, prefix="."):
+def evaluate_all(device, model, model_id=None, model_dir=None, num_runs=20, prefix="."):
     if model_id is not None and model_dir is not None:
         model = torch.nn.DataParallel(model)
         save_path = os.path.join(model_dir, model_id)

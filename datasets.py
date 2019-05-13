@@ -10,6 +10,7 @@ import torch.utils.data as data
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
+import copy
 
 img_transforms = transforms.Compose([
     transforms.Resize(28),
@@ -159,7 +160,7 @@ class BasicDataset(data.Dataset):
 class TripletSampler(data.Sampler):
     def __init__(self, data_source, shuffle=False) -> None:
         super().__init__(data_source)
-        self.indices_dict = data_source.indices_dict
+        self.indices_dict = copy.deepcopy(data_source.indices_dict)
         self.classes = list(self.indices_dict.keys())
         self.shuffle = shuffle
 

@@ -42,8 +42,8 @@ def parse_args():
                         help="Directory to store logs", default="logs", type=str)
     parser.add_argument("--deterministic", dest='deterministic',
                         help="Whether to set random seed", default=False, type=bool)
-    parser.add_argument("--num_eval_runs", dest='num_eval_runs',
-                        help="Number of evaluation runs", default=20, type=int)
+    parser.add_argument("--num_ways", dest='num_ways',
+                        help="Number of ways of classification", default=20, type=int)
     return parser.parse_args()
 
 
@@ -60,7 +60,8 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = models.TripletNet().to(device)
+    # model = models.TripletNet().to(device)
+    model = models.TripletNetWithFC().to(device)
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
@@ -84,7 +85,7 @@ if __name__ == '__main__':
                                                     num_workers=args.num_workers, pin_memory=True),
                            "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
                                                   num_workers=args.num_workers, pin_memory=True)}
-    pair_dataloaders = {"val": data.DataLoader(val_dataset, batch_size=2 * args.num_eval_runs,
+    pair_dataloaders = {"val": data.DataLoader(val_dataset, batch_size=2 * args.num_ways,
                                                shuffle=False, num_workers=args.num_workers,
                                                pin_memory=True, drop_last=True)}
 
@@ -95,8 +96,8 @@ if __name__ == '__main__':
     # anc_labels, pos_labels, neg_labels = torch.chunk(labels, 3, dim=1)
 
     # batch, labels = next(pair_dataloaders["val"].__iter__())
-    # batch = torch.reshape(batch, (args.num_eval_runs, 2, *batch.size()[1:]))
-    # labels = torch.reshape(labels, (args.num_eval_runs, -1))
+    # batch = torch.reshape(batch, (args.num_ways, 2, *batch.size()[1:]))
+    # labels = torch.reshape(labels, (args.num_ways, -1))
     # anc, pos = (torch.squeeze(x, dim=1) for x in torch.chunk(batch, 2, dim=1))
     # anc_labels, pos_labels = (torch.squeeze(x, dim=1) for x in torch.chunk(labels, 2, dim=1))
     #
@@ -150,7 +151,7 @@ if __name__ == '__main__':
     model, model_id, checkpoint = train.train_triplet_model(device, triplet_dataloaders, pair_dataloaders,
                                                             criterion, optimiser, args.model_dir,
                                                             args.num_epochs, model, model_id=args.model_id)
-    avg_err = eval.evaluate_all(device, model, args.num_eval_runs, prefix=args.eval_dir)
+    avg_err = eval.evaluate_all(device, model, prefix=args.eval_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))
 
     for phase in checkpoint["epoch_losses"]:
