@@ -166,7 +166,7 @@ def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
 
 
 def train_model(device, triplet_dataloaders, pair_dataloaders,
-                criterion, optimiser_dict, model_dir,
+                criterion, optimiser_dict, scheduler_dict, model_dir,
                 num_epochs, model_dict, model_forward, eval_forward, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
@@ -194,6 +194,9 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                            for model_name in model_dict}
     best_opt_params_dict = {model_name: copy.deepcopy(optimiser_dict[model_name].state_dict())
                             for model_name in optimiser_dict}
+    for model_name in scheduler_dict:
+        scheduler_dict[model_name].last_epoch = last_epoch - 1
+
     since = time.time()
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
@@ -260,6 +263,9 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                                            for model_name in model_dict}
                     best_opt_params_dict = {model_name: copy.deepcopy(optimiser_dict[model_name].state_dict())
                                             for model_name in optimiser_dict}
+
+        for model_name in scheduler_dict:
+            scheduler_dict[model_name].step()
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(

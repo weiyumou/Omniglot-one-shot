@@ -60,7 +60,9 @@ if __name__ == '__main__':
     # model = models.TripletNetWithFC().to(device)
     # model = models.MetricNet().to(device)
     model_dict = {"triplet": models.TripletNetWithFC().to(device)}
-                  # "metric": models.MetricNet().to(device)}
+    # "metric": models.MetricNet().to(device)}
+    lrs = {"triplet": 1e-3}
+    gammas = {"triplet": 0.95}
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
@@ -69,7 +71,13 @@ if __name__ == '__main__':
 
     optimiser_dict = dict()
     for model_name in model_dict:
-        optimiser_dict[model_name] = optim.Adam(model_dict[model_name].parameters())
+        optimiser_dict[model_name] = optim.Adam(model_dict[model_name].parameters(),
+                                                lr=lrs[model_name])
+
+    scheduler_dict = dict()
+    for model_name in optimiser_dict:
+        scheduler_dict[model_name] = optim.lr_scheduler.ExponentialLR(optimiser_dict[model_name],
+                                                                      gamma=gammas[model_name])
 
     train_dict, val_dict = datasets.load_train_val(args.background_set_root, args.train_perct)
     train_dataset = datasets.BasicDataset(train_dict)
@@ -103,8 +111,8 @@ if __name__ == '__main__':
     #                             model_id=args.model_id, model_dir=args.model_dir)
 
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
-                                                    criterion, optimiser_dict, args.model_dir,
-                                                    args.num_epochs, model_dict, train.adv_model_forward,
+                                                    criterion, optimiser_dict, scheduler_dict, args.model_dir,
+                                                    args.num_epochs, model_dict, train.triplet_model_forward,
                                                     eval.triplet_evaluate, model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model_dict, eval.triplet_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
