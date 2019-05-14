@@ -159,9 +159,7 @@ def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
     loss.backward()
 
     with torch.no_grad():
-        datasets.display_image(negatives[0])
         negatives = torch.clamp(negatives + 1e-3 * torch.sign(negatives.grad), min=0, max=1)
-        datasets.display_image(negatives[0])
     adv_loss = triplet_model_forward(model_dict, criterion, anchors, positives, negatives)
     return 0.5 * adv_loss + 0.5 * loss
 
