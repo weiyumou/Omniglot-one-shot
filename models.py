@@ -84,7 +84,7 @@ class TripletNetWithFC(nn.Module):
 class MetricNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(in_features=128*2, out_features=512)
+        self.fc1 = nn.Linear(in_features=128 * 2, out_features=512)
         self.fc2 = nn.Linear(in_features=512, out_features=1)
 
     def forward(self, x):
@@ -134,3 +134,29 @@ class MetricNet(nn.Module):
 #         fc1_out = self.fc1(conv3_out)
 #         fc2_out = self.fc2(fc1_out)
 #         return fc2_out
+
+
+class BrendenNet(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=120, kernel_size=5, bias=False),  # 24
+            nn.BatchNorm2d(num_features=120),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)  # 12
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=120, out_channels=300, kernel_size=5, bias=False),  # 8
+            nn.BatchNorm2d(num_features=300),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)  # 4
+        )
+        self.fc = nn.Linear(in_features=300*4*4, out_features=3000)
+
+    def forward(self, x):
+        conv1_out = self.conv1(x)
+        conv2_out = self.conv2(conv1_out)
+        conv2_out = conv2_out.reshape(conv2_out.size(0), -1)
+        fc_out = self.fc(conv2_out)
+        return fc_out

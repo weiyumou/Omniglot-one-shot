@@ -95,12 +95,20 @@ if __name__ == '__main__':
     criterion = losses.SlideLoss()
     # optimiser = optim.Adam(model.parameters())
 
+    # model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
+    #                                                 criterion, optimiser_dict, args.model_dir,
+    #                                                 args.num_epochs, model_dict, train.metric_model_forward,
+    #                                                 eval.metric_evaluate, model_id=args.model_id)
+    # avg_err = eval.evaluate_all(device, model_dict, eval.metric_evaluate, prefix=args.eval_dir,
+    #                             model_id=args.model_id, model_dir=args.model_dir)
+
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
                                                     criterion, optimiser_dict, args.model_dir,
                                                     args.num_epochs, model_dict, train.adv_model_forward,
                                                     eval.triplet_evaluate, model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model_dict, eval.triplet_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
+
     print("Average Error Rate: {:.4f}".format(avg_err))
 
     for phase in checkpoint["epoch_losses"]:
