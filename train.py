@@ -151,17 +151,18 @@ def metric_model_forward(model_dict, criterion, anchors, positives, negatives):
 
 
 def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
-    import datasets
     negatives.requires_grad_()
-    triplet_model = model_dict["triplet"]
     loss = triplet_model_forward(model_dict, criterion, anchors, positives, negatives)
-    triplet_model.zero_grad()
-    loss.backward()
+    if loss.requires_grad:
+        model_dict["triplet"].zero_grad()
+        loss.backward()
+    else:
+        return loss
 
     with torch.no_grad():
-        negatives = torch.clamp(negatives + 1e-3 * torch.sign(negatives.grad), min=0, max=1)
+        negatives = torch.clamp(negatives + 1e-2 * torch.sign(negatives.grad), min=0, max=1)
     adv_loss = triplet_model_forward(model_dict, criterion, anchors, positives, negatives)
-    return 0.5 * adv_loss + 0.5 * loss
+    return adv_loss
 
 
 def train_model(device, triplet_dataloaders, pair_dataloaders,
