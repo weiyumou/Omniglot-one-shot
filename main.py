@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--log_dir", dest='log_dir',
                         help="Directory to store logs", default="logs", type=str)
     parser.add_argument("--deterministic", dest='deterministic',
-                        help="Whether to set random seed", default=False, type=bool)
+                        help="Whether to set random seed", default=False, action="store_true")
     parser.add_argument("--num_ways", dest='num_ways',
                         help="Number of ways of classification", default=20, type=int)
     return parser.parse_args()
@@ -59,8 +59,8 @@ if __name__ == '__main__':
     # model = models.TripletNet().to(device)
     # model = models.TripletNetWithFC().to(device)
     # model = models.MetricNet().to(device)
-    model_dict = {"triplet": models.TripletNetWithFC().to(device),
-                  "metric": models.MetricNet().to(device)}
+    model_dict = {"triplet": models.TripletNetWithFC().to(device)}
+                  # "metric": models.MetricNet().to(device)}
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
@@ -97,9 +97,9 @@ if __name__ == '__main__':
 
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
                                                     criterion, optimiser_dict, args.model_dir,
-                                                    args.num_epochs, model_dict, train.metric_model_forward,
-                                                    eval.metric_evaluate, model_id=args.model_id)
-    avg_err = eval.evaluate_all(device, model_dict, eval.metric_evaluate, prefix=args.eval_dir,
+                                                    args.num_epochs, model_dict, train.adv_model_forward,
+                                                    eval.triplet_evaluate, model_id=args.model_id)
+    avg_err = eval.evaluate_all(device, model_dict, eval.triplet_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
     print("Average Error Rate: {:.4f}".format(avg_err))
 
