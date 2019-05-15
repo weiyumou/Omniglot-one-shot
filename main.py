@@ -57,27 +57,16 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # model = models.TripletNet().to(device)
-    # model = models.TripletNetWithFC().to(device)
+    model = models.TripletNetWithFC().to(device)
     # model = models.MetricNet().to(device)
-    model_dict = {"triplet": models.TripletNetWithFC().to(device)}
-    # "metric": models.MetricNet().to(device)}
-    lrs = {"triplet": 1e-3}
-    gammas = {"triplet": 0.95}
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
-        for model_name in model_dict:
-            model_dict[model_name] = nn.DataParallel(model_dict[model_name])
+        model = nn.DataParallel(model)
 
-    optimiser_dict = dict()
-    for model_name in model_dict:
-        optimiser_dict[model_name] = optim.Adam(model_dict[model_name].parameters(),
-                                                lr=lrs[model_name])
-
-    scheduler_dict = dict()
-    for model_name in optimiser_dict:
-        scheduler_dict[model_name] = optim.lr_scheduler.ExponentialLR(optimiser_dict[model_name],
-                                                                      gamma=gammas[model_name])
+    optimiser = optim.Adam(model.parameters())
+    scheduler = optim.lr_scheduler.ExponentialLR(optimiser, gamma=0.95)
+    criterion = losses.SlideLoss()
 
     train_dict, val_dict = datasets.load_train_val(args.background_set_root, args.train_perct)
     train_dataset = datasets.BasicDataset(train_dict)
@@ -86,35 +75,21 @@ if __name__ == '__main__':
     batch_sizes = {"train": args.batch_size_train, "val": args.batch_size_val}
 
     train_triplet_sampler = datasets.TripletSampler(train_dataset, shuffle=True)
-    # val_triplet_sampler = datasets.TripletSampler(val_dataset)
-
     train_batch_sampler = datasets.TripletBatchSampler(train_triplet_sampler,
                                                        batch_size=batch_sizes["train"] * 3)
-    # val_batch_sampler = datasets.TripletBatchSampler(val_triplet_sampler,
-    #                                                  batch_size=batch_sizes["val"] * 3)
     triplet_dataloaders = {"train": data.DataLoader(train_dataset, batch_sampler=train_batch_sampler,
                                                     num_workers=args.num_workers, pin_memory=True)}
-                           # "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
-                           #                        num_workers=args.num_workers, pin_memory=True)}
+
     pair_dataloaders = {"val": data.DataLoader(val_dataset, batch_size=2 * args.num_ways,
                                                shuffle=False, num_workers=args.num_workers,
                                                pin_memory=True, drop_last=True)}
 
-    criterion = losses.SlideLoss()
-
-    # model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
-    #                                                 criterion, optimiser_dict, args.model_dir,
-    #                                                 args.num_epochs, model_dict, train.metric_model_forward,
-    #                                                 eval.metric_evaluate, model_id=args.model_id)
-    # avg_err = eval.evaluate_all(device, model_dict, eval.metric_evaluate, prefix=args.eval_dir,
-    #                             model_id=args.model_id, model_dir=args.model_dir)
-
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
-                                                    criterion, optimiser_dict, scheduler_dict, args.model_dir,
-                                                    args.log_dir, args.num_epochs, model_dict,
+                                                    criterion, optimiser, scheduler, args.model_dir,
+                                                    args.log_dir, args.num_epochs, model,
                                                     train.triplet_model_forward, eval.triplet_evaluate,
                                                     model_id=args.model_id)
-    avg_err = eval.evaluate_all(device, model_dict, eval.triplet_evaluate, prefix=args.eval_dir,
+    avg_err = eval.evaluate_all(device, model, eval.triplet_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
 
     print("Average Error Rate: {:.4f}".format(avg_err))

@@ -171,12 +171,12 @@ class TripletSampler(data.Sampler):
             for label in self.indices_dict:
                 random.shuffle(self.indices_dict[label])
         self.curr_class_idx = 0
-        self.class_iters = [iter(itertools.permutations(self.indices_dict[cls], 2))
+        self.class_iters = [iter(itertools.combinations(self.indices_dict[cls], 2))
                             for cls in self.classes]
         return self
 
     def __len__(self) -> int:
-        return sum(len(self.indices_dict[x]) * (len(self.indices_dict[x]) - 1)
+        return sum(len(self.indices_dict[x]) * (len(self.indices_dict[x]) - 1) // 2
                    for x in self.indices_dict)
 
     def __next__(self):
