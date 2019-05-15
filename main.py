@@ -86,22 +86,21 @@ if __name__ == '__main__':
     batch_sizes = {"train": args.batch_size_train, "val": args.batch_size_val}
 
     train_triplet_sampler = datasets.TripletSampler(train_dataset, shuffle=True)
-    val_triplet_sampler = datasets.TripletSampler(val_dataset)
+    # val_triplet_sampler = datasets.TripletSampler(val_dataset)
 
     train_batch_sampler = datasets.TripletBatchSampler(train_triplet_sampler,
                                                        batch_size=batch_sizes["train"] * 3)
-    val_batch_sampler = datasets.TripletBatchSampler(val_triplet_sampler,
-                                                     batch_size=batch_sizes["val"] * 3)
+    # val_batch_sampler = datasets.TripletBatchSampler(val_triplet_sampler,
+    #                                                  batch_size=batch_sizes["val"] * 3)
     triplet_dataloaders = {"train": data.DataLoader(train_dataset, batch_sampler=train_batch_sampler,
-                                                    num_workers=args.num_workers, pin_memory=True),
-                           "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
-                                                  num_workers=args.num_workers, pin_memory=True)}
+                                                    num_workers=args.num_workers, pin_memory=True)}
+                           # "val": data.DataLoader(val_dataset, batch_sampler=val_batch_sampler,
+                           #                        num_workers=args.num_workers, pin_memory=True)}
     pair_dataloaders = {"val": data.DataLoader(val_dataset, batch_size=2 * args.num_ways,
                                                shuffle=False, num_workers=args.num_workers,
                                                pin_memory=True, drop_last=True)}
 
     criterion = losses.SlideLoss()
-    # optimiser = optim.Adam(model.parameters())
 
     # model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
     #                                                 criterion, optimiser_dict, args.model_dir,
