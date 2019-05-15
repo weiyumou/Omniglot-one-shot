@@ -7,7 +7,7 @@ import math
 import collections
 import torch.nn.functional as F
 
-# import torch.utils.tensorboard as tensorboard
+from torch.utils.tensorboard import SummaryWriter
 
 
 # def train_model(device, dataloaders, criterion, optimiser, model_dir,
@@ -118,18 +118,25 @@ import torch.nn.functional as F
 #     return model, model_id
 
 
-def triplet_model_forward(model_dict, criterion, anchors, positives, negatives):
+def triplet_model_forward(model_dict, criterion,
+                          anchors, positives, negatives, writer, epoch, phase):
     model = model_dict["triplet"]
     anc_out = model(anchors)
     pos_out = model(positives)
     neg_out = model(negatives)
+
+    writer.add_embedding(anc_out, label_img=anchors, global_step=epoch, tag="{}_anc_out".format(phase))
+    writer.add_embedding(pos_out, label_img=positives, global_step=epoch, tag="{}_pos_out".format(phase))
+    writer.add_embedding(neg_out, label_img=negatives, global_step=epoch, tag="{}_neg_out".format(phase))
+
     anc_pos = F.pairwise_distance(anc_out, pos_out, p=2, keepdim=True)
     anc_neg = F.pairwise_distance(anc_out, neg_out, p=2, keepdim=True)
     loss = criterion(anc_pos, anc_neg)
     return loss
 
 
-def metric_model_forward(model_dict, criterion, anchors, positives, negatives):
+def metric_model_forward(model_dict, criterion,
+                         anchors, positives, negatives, writer, epoch, phase):
     triplet_model = model_dict["triplet"]
     anc_out = triplet_model(anchors)
     pos_out = triplet_model(positives)
@@ -150,9 +157,11 @@ def metric_model_forward(model_dict, criterion, anchors, positives, negatives):
     # return loss
 
 
-def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
+def adv_model_forward(model_dict, criterion,
+                      anchors, positives, negatives, writer, epoch, phase):
     negatives.requires_grad_()
-    loss = triplet_model_forward(model_dict, criterion, anchors, positives, negatives)
+    loss = triplet_model_forward(model_dict, criterion,
+                                 anchors, positives, negatives, writer, epoch, phase)
     if loss.requires_grad:
         model_dict["triplet"].zero_grad()
         loss.backward()
@@ -161,12 +170,13 @@ def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
 
     with torch.no_grad():
         negatives = torch.clamp(negatives + 1e-2 * torch.sign(negatives.grad), min=0, max=1)
-    adv_loss = triplet_model_forward(model_dict, criterion, anchors, positives, negatives)
+    adv_loss = triplet_model_forward(model_dict, criterion,
+                                     anchors, positives, negatives, writer, epoch, phase)
     return adv_loss
 
 
 def train_model(device, triplet_dataloaders, pair_dataloaders,
-                criterion, optimiser_dict, scheduler_dict, model_dir,
+                criterion, optimiser_dict, scheduler_dict, model_dir, log_dir,
                 num_epochs, model_dict, model_forward, eval_forward, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
@@ -198,6 +208,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
         scheduler_dict[model_name].last_epoch = last_epoch - 1
 
     since = time.time()
+    writer = SummaryWriter(log_dir)
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
         print('-' * 10)
@@ -225,7 +236,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                 negatives = negatives.to(device)
 
                 with torch.set_grad_enabled(phase == "train"):
-                    loss = model_forward(model_dict, criterion, anchors, positives, negatives)
+                    loss = model_forward(model_dict, criterion,
+                                         anchors, positives, negatives, writer, epoch, phase)
 
                 if phase == "train":
                     for model_name in optimiser_dict:
@@ -240,6 +252,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             epoch_loss = running_loss / loss_total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
             epoch_losses[phase].append(epoch_loss)
+            writer.add_scalar("{} loss".format(phase), epoch_loss, epoch)
 
             if phase == "val":
                 running_err = 0.0
@@ -256,6 +269,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                 epoch_err = running_err / err_total
                 print("{} Error: {:.4f}".format(phase, epoch_err))
                 epoch_errors[phase].append(epoch_err)
+                writer.add_scalar("{} error".format(phase), epoch_err, epoch)
 
                 if epoch_err < best_val_err:
                     best_val_err = epoch_err
@@ -263,9 +277,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                                            for model_name in model_dict}
                     best_opt_params_dict = {model_name: copy.deepcopy(optimiser_dict[model_name].state_dict())
                                             for model_name in optimiser_dict}
-
-        for model_name in scheduler_dict:
-            scheduler_dict[model_name].step()
+        # for model_name in scheduler_dict:
+        #     scheduler_dict[model_name].step()
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -284,4 +297,5 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
         checkpoint[model_name + "_model_state_dict"] = model_dict[model_name].state_dict()
         checkpoint[model_name + "_optimiser_state_dict"] = optimiser_dict[model_name].state_dict()
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
+    writer.close()
     return model_dict, model_id, checkpoint

@@ -163,13 +163,16 @@ class TripletSampler(data.Sampler):
         self.indices_dict = copy.deepcopy(data_source.indices_dict)
         self.classes = list(self.indices_dict.keys())
         self.shuffle = shuffle
+        self.__iter__()
 
     def __iter__(self):
         if self.shuffle:
             random.shuffle(self.classes)
+            for label in self.indices_dict:
+                random.shuffle(self.indices_dict[label])
         self.curr_class_idx = 0
-        self.curr_class_iter = iter(itertools.combinations(
-            self.indices_dict[self.classes[self.curr_class_idx]], 2))
+        self.class_iters = [iter(itertools.combinations(
+            self.indices_dict[self.classes[cls]], 2)) for cls in range(len(self.classes))]
         return self
 
     def __len__(self) -> int:
@@ -178,22 +181,12 @@ class TripletSampler(data.Sampler):
                    for x in self.indices_dict)
 
     def __next__(self):
-        try:
-            anc_pos_pair = next(self.curr_class_iter)
-        except StopIteration:
-            if self.shuffle:
-                random.shuffle(self.indices_dict[self.classes[self.curr_class_idx]])
-            self.curr_class_idx += 1
-            if self.curr_class_idx >= len(self.classes):
-                raise StopIteration
-            self.curr_class_iter = iter(itertools.combinations(
-                self.indices_dict[self.classes[self.curr_class_idx]], 2))
-            anc_pos_pair = next(self.curr_class_iter)
-
+        anc_pos_pair = next(self.class_iters[self.curr_class_idx])
         neg_class = random.choice(self.classes)
         while neg_class == self.classes[self.curr_class_idx]:
             neg_class = random.choice(self.classes)
         neg = random.choice(self.indices_dict[neg_class])
+        self.curr_class_idx = (self.curr_class_idx + 1) % len(self.classes)
         return anc_pos_pair + (neg,)
 
 

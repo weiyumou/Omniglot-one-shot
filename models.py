@@ -71,14 +71,16 @@ class TripletNetWithFC(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.fc = nn.Linear(in_features=128 * 3 * 3, out_features=128)
+        nn.init.xavier_normal_(self.fc.weight)
+        nn.init.constant_(self.fc.bias, 0)
 
     def forward(self, x):
         conv1_out = self.conv1(x)
         conv2_out = self.conv2(conv1_out)
         conv3_out = self.conv3(conv2_out)
         conv3_out = conv3_out.reshape(conv3_out.size(0), -1)
-        net_out = self.fc(conv3_out)
-        return net_out
+        fc_out = self.fc(conv3_out)
+        return fc_out
 
 
 class MetricNet(nn.Module):
