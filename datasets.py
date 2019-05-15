@@ -176,8 +176,7 @@ class TripletSampler(data.Sampler):
         return self
 
     def __len__(self) -> int:
-        return sum(len(self.indices_dict[x]) *
-                   (len(self.indices_dict[x]) - 1) // 2
+        return sum(len(self.indices_dict[x]) * (len(self.indices_dict[x]) - 1)
                    for x in self.indices_dict)
 
     def __next__(self):
