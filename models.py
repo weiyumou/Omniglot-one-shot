@@ -154,7 +154,7 @@ class BrendenNet(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)  # 4
         )
-        self.fc = nn.Linear(in_features=300*4*4, out_features=3000)
+        self.fc = nn.Linear(in_features=300 * 4 * 4, out_features=3000)
 
     def forward(self, x):
         conv1_out = self.conv1(x)
