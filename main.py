@@ -112,8 +112,9 @@ if __name__ == '__main__':
 
     model, model_id, checkpoint = train.train_model(device, triplet_dataloaders, pair_dataloaders,
                                                     criterion, optimiser_dict, scheduler_dict, args.model_dir,
-                                                    args.num_epochs, model_dict, train.triplet_model_forward,
-                                                    eval.triplet_evaluate, model_id=args.model_id)
+                                                    args.log_dir, args.num_epochs, model_dict,
+                                                    train.triplet_model_forward, eval.triplet_evaluate,
+                                                    model_id=args.model_id)
     avg_err = eval.evaluate_all(device, model_dict, eval.triplet_evaluate, prefix=args.eval_dir,
                                 model_id=args.model_id, model_dir=args.model_dir)
 

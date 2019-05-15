@@ -7,7 +7,7 @@ import math
 import collections
 import torch.nn.functional as F
 
-# import torch.utils.tensorboard as tensorboard
+from torch.utils.tensorboard import SummaryWriter
 
 
 # def train_model(device, dataloaders, criterion, optimiser, model_dir,
@@ -166,7 +166,7 @@ def adv_model_forward(model_dict, criterion, anchors, positives, negatives):
 
 
 def train_model(device, triplet_dataloaders, pair_dataloaders,
-                criterion, optimiser_dict, scheduler_dict, model_dir,
+                criterion, optimiser_dict, scheduler_dict, model_dir, log_dir,
                 num_epochs, model_dict, model_forward, eval_forward, model_id=None):
     last_epoch = 0
     best_val_err = math.inf
@@ -196,6 +196,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                             for model_name in optimiser_dict}
     for model_name in scheduler_dict:
         scheduler_dict[model_name].last_epoch = last_epoch - 1
+
+    writer = SummaryWriter(log_dir)
 
     since = time.time()
     for epoch in range(num_epochs):
@@ -240,6 +242,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             epoch_loss = running_loss / loss_total
             print("{} Loss: {:.4f}".format(phase, epoch_loss))
             epoch_losses[phase].append(epoch_loss)
+            writer.add_scalar("{} loss".format(phase), epoch_loss, epoch)
 
             if phase == "val":
                 running_err = 0.0
@@ -256,6 +259,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                 epoch_err = running_err / err_total
                 print("{} Error: {:.4f}".format(phase, epoch_err))
                 epoch_errors[phase].append(epoch_err)
+                writer.add_scalar("{} error".format(phase), epoch_err, epoch)
 
                 if epoch_err < best_val_err:
                     best_val_err = epoch_err
@@ -264,8 +268,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
                     best_opt_params_dict = {model_name: copy.deepcopy(optimiser_dict[model_name].state_dict())
                                             for model_name in optimiser_dict}
 
-        for model_name in scheduler_dict:
-            scheduler_dict[model_name].step()
+        # for model_name in scheduler_dict:
+        #     scheduler_dict[model_name].step()
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -284,4 +288,5 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
         checkpoint[model_name + "_model_state_dict"] = model_dict[model_name].state_dict()
         checkpoint[model_name + "_optimiser_state_dict"] = optimiser_dict[model_name].state_dict()
     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
+    writer.close()
     return model_dict, model_id, checkpoint
