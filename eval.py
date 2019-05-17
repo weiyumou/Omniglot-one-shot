@@ -1,6 +1,7 @@
 import os
 import datasets
 import torch
+import torch.nn.functional as F
 
 
 def triplet_evaluate(device, model, train_batch, test_batch):
@@ -11,7 +12,8 @@ def triplet_evaluate(device, model, train_batch, test_batch):
         train_embeds = model(train_batch)
         test_embeds = model(test_batch)
 
-    dist_matrix = calc_dist_matrix(train_embeds, test_embeds)
+    dist_matrix = torch.stack([F.pairwise_distance(train_embeds, test_embeds[i], p=2)
+                               for i in range(test_embeds.size(0))])
     preds = torch.argmin(dist_matrix, dim=1)
     labels = torch.tensor(range(train_batch.size(0)), device=device)
     corrects = torch.sum(preds == labels).item()

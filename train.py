@@ -8,7 +8,7 @@ import collections
 import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
-
+import eval
 
 # def train_model(device, dataloaders, criterion, optimiser, model_dir,
 #                 num_epochs, num_classes, num_samples,
@@ -250,6 +250,9 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             best_val_err = epoch_err
             best_model_wts = copy.deepcopy(model.state_dict())
             best_opt_params = copy.deepcopy(optimiser.state_dict())
+
+        err = eval.evaluate_all(device, model, eval_forward, prefix="all_runs")
+        writer.add_scalar("eval_error", err, epoch)
 
         # scheduler.step()
 

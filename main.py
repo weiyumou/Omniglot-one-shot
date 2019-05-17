@@ -57,8 +57,9 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # model = models.TripletNet().to(device)
-    model = models.TripletNetWithFC().to(device)
+    # model = models.TripletNetWithFC().to(device)
     # model = models.MetricNet().to(device)
+    model = models.ResnetModel().to(device)
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))

@@ -13,7 +13,7 @@ from PIL import Image
 import copy
 
 img_transforms = transforms.Compose([
-    transforms.Resize(28),
+    # transforms.Resize(28),
     transforms.ToTensor()
 ])
 

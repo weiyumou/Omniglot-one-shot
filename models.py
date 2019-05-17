@@ -1,5 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 
 
 class TripletNet(nn.Module):
@@ -162,3 +163,15 @@ class BrendenNet(nn.Module):
         conv2_out = conv2_out.reshape(conv2_out.size(0), -1)
         fc_out = self.fc(conv2_out)
         return fc_out
+
+
+class ResnetModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.resnet = torchvision.models.resnet18(pretrained=True)
+        self.resnet.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=7,
+                                      stride=2, padding=3, bias=False)
+        self.resnet.fc = nn.Linear(in_features=512, out_features=128)
+
+    def forward(self, x):
+        return self.resnet(x)
