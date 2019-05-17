@@ -252,8 +252,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             best_opt_params = copy.deepcopy(optimiser.state_dict())
 
         err = eval.evaluate_all(device, model, eval_forward, prefix="all_runs")
+        print("Eval Error: {:.4f}".format(err))
         writer.add_scalar("eval_error", err, epoch)
-
         # scheduler.step()
 
     time_elapsed = time.time() - since
