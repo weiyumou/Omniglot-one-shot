@@ -162,3 +162,43 @@ class BrendenNet(nn.Module):
         conv2_out = conv2_out.reshape(conv2_out.size(0), -1)
         fc_out = self.fc(conv2_out)
         return fc_out
+
+
+class KochNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=64, kernel_size=10, bias=False),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=7, bias=False),
+            nn.BatchNorm2d(num_features=128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=4, bias=False),
+            nn.BatchNorm2d(num_features=128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=4, bias=False),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(),
+        )
+        self.fc = nn.Linear(in_features=256 * 6 * 6, out_features=4096)
+        nn.init.xavier_normal_(self.fc.weight)
+        nn.init.constant_(self.fc.bias, 0)
+
+    def forward(self, x):
+        conv1_out = self.conv1(x)
+        conv2_out = self.conv2(conv1_out)
+        conv3_out = self.conv3(conv2_out)
+        conv4_out = self.conv4(conv3_out)
+        conv4_out = conv4_out.reshape(conv4_out.size(0), -1)
+        fc_out = self.fc(conv4_out)
+        return fc_out
