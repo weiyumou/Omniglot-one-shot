@@ -10,123 +10,16 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import eval
 
-# def train_model(device, dataloaders, criterion, optimiser, model_dir,
-#                 num_epochs, num_classes, num_samples,
-#                 batch_sizes, log_dir, model, model_id=None):
-#     last_epoch = 0
-#     best_val_err = math.inf
-#
-#     if model_id is None:
-#         model_id = str(int(time.time()))
-#         save_path = os.path.join(model_dir, model_id)
-#         os.makedirs(save_path, exist_ok=True)
-#     else:
-#         save_path = os.path.join(model_dir, model_id)
-#         checkpoint = torch.load(os.path.join(save_path, model_id + ".pt"))
-#         model.load_state_dict(checkpoint["model_state_dict"])
-#         optimiser.load_state_dict(checkpoint["optimiser_state_dict"])
-#         last_epoch = checkpoint["last_epoch"]
-#         best_val_err = checkpoint["best_val_err"]
-#
-#     model = model.to(device)
-#     best_model_wts = copy.deepcopy(model.state_dict())
-#     best_opt_params = copy.deepcopy(optimiser.state_dict())
-#     # writer = tensorboard.SummaryWriter(log_dir)
-#     since = time.time()
-#     for epoch in range(num_epochs):
-#         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
-#         print('-' * 10)
-#
-#         for phase in ["train", "val"]:
-#             if phase == "train":
-#                 model.train()
-#             else:
-#                 model.eval()
-#
-#             running_loss = 0.0
-#             loss_total = 0
-#             running_err = 0.0
-#             err_total = 0
-#             for batch in dataloaders[phase]:
-#                 anchors, positives, negatives, *_ = \
-#                     datasets.gen_triplets_from_batch(batch,
-#                                                      num_classes=num_classes,
-#                                                      num_samples=num_samples[phase])
-#                 anchors = anchors.split(batch_sizes[phase], dim=0)
-#                 positives = positives.split(batch_sizes[phase], dim=0)
-#                 negatives = negatives.split(batch_sizes[phase], dim=0)
-#
-#                 if phase == "val":
-#                     train_batch, test_batch, _ = \
-#                         datasets.gen_valset_from_batch(batch, num_classes, num_samples[phase])
-#
-#                 for i in tqdm.tqdm(range(len(anchors)), desc="Triplet Batches"):
-#                     # grid = torchvision.utils.make_grid(anchors[i][:5])
-#                     # writer.add_image("Images", grid, 0)
-#                     # writer.add_graph(model, anchors[i])
-#
-#                     anc = anchors[i].to(device)
-#                     pos = positives[i].to(device)
-#                     neg = negatives[i].to(device)
-#
-#                     # if i == 0:
-#                     #     img_grid = torchvision.utils.make_grid([anc[0], pos[0], neg[0]])
-#                     #     datasets.display_image(img_grid)
-#
-#                     with torch.set_grad_enabled(phase == "train"):
-#                         anc_out = model(anc)
-#                         pos_out = model(pos)
-#                         neg_out = model(neg)
-#                         loss = criterion(anc_out, pos_out, neg_out)
-#
-#                     if phase == "train":
-#                         optimiser.zero_grad()
-#                         loss.backward()
-#                         optimiser.step()
-#                     else:
-#                         err = eval.triplet_evaluate(device, model, train_batch, test_batch)
-#                         running_err += err
-#                         err_total += 1
-#
-#                     running_loss += loss.item() * anc.size(0)
-#                     loss_total += anc.size(0)
-#
-#             epoch_loss = running_loss / loss_total
-#             print("{} Loss: {:.4f}".format(phase, epoch_loss))
-#
-#             if phase == "val":
-#                 epoch_err = running_err / err_total
-#                 print("{} Error: {:.4f}".format(phase, epoch_err))
-#
-#                 if epoch_err < best_val_err:
-#                     best_val_err = epoch_err
-#                     best_model_wts = copy.deepcopy(model.state_dict())
-#                     best_opt_params = copy.deepcopy(optimiser.state_dict())
-#
-#     time_elapsed = time.time() - since
-#     print('Training complete in {:.0f}m {:.0f}s'.format(
-#         time_elapsed // 60, time_elapsed % 60))
-#     print('Best val Error: {:4f}'.format(best_val_err))
-#     model.load_state_dict(best_model_wts)
-#     optimiser.load_state_dict(best_opt_params)
-#     checkpoint = {"model_state_dict": model.state_dict(),
-#                   "optimiser_state_dict": optimiser.state_dict(),
-#                   "last_epoch": last_epoch + num_epochs,
-#                   "best_val_err": best_val_err}
-#     torch.save(checkpoint, os.path.join(save_path, model_id + ".pt"))
-#     # writer.close()
-#     return model, model_id
-
 
 def triplet_model_forward(model, criterion, anchors, positives, negatives):
-    anc_out = model(anchors)
-    pos_out = model(positives)
-    neg_out = model(negatives)
+    anc_out, conv3_out, conv2_out, conv1_out = model(anchors)
+    pos_out, *_ = model(positives)
+    neg_out, *_ = model(negatives)
 
     anc_pos = F.pairwise_distance(anc_out, pos_out, p=2, keepdim=True)
     anc_neg = F.pairwise_distance(anc_out, neg_out, p=2, keepdim=True)
     loss = criterion(anc_pos, anc_neg)
-    return loss, anc_out, pos_out, neg_out
+    return loss, anc_out, pos_out, neg_out, conv3_out, conv2_out, conv1_out
 
 
 # def metric_model_forward(model_dict, criterion,
@@ -143,12 +36,12 @@ def triplet_model_forward(model, criterion, anchors, positives, negatives):
 #     anc_neg_out = metric_model(anc_neg)
 #     loss = criterion(anc_pos_out, anc_neg_out)
 #     return loss
-    # anc_pos = torch.cat((anchors, positives), dim=1)
-    # anc_neg = torch.cat((anchors, negatives), dim=1)
-    # anc_pos_out = model(anc_pos)
-    # anc_neg_out = model(anc_neg)
-    # loss = criterion(anc_pos_out, anc_neg_out)
-    # return loss
+# anc_pos = torch.cat((anchors, positives), dim=1)
+# anc_neg = torch.cat((anchors, negatives), dim=1)
+# anc_pos_out = model(anc_pos)
+# anc_neg_out = model(anc_neg)
+# loss = criterion(anc_pos_out, anc_neg_out)
+# return loss
 
 
 def adv_model_forward(model, criterion, anchors, positives, negatives):
@@ -193,6 +86,14 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
     writer = SummaryWriter(log_dir)
 
     since = time.time()
+
+    num_iter = 0
+    prev_conv1_weight = copy.deepcopy(model.conv1[0].weight)
+    prev_conv2_weight = copy.deepcopy(model.conv2[0].weight)
+    prev_conv3_weight = copy.deepcopy(model.conv3[0].weight)
+    prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
+    # prev_fc_weight = copy.deepcopy(model.fc.weight)
+    # prev_fc_bias = copy.deepcopy(model.fc.bias)
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
         print('-' * 10)
@@ -212,7 +113,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             positives = positives.to(device)
             negatives = negatives.to(device)
 
-            loss, anc_out, pos_out, neg_out = model_forward(model, criterion, anchors, positives, negatives)
+            loss, *_, conv3_out, conv2_out, conv1_out = model_forward(model, criterion, anchors, positives, negatives)
             # writer.add_embedding(anc_out, label_img=anchors, global_step=epoch, tag="anc_out")
             # writer.add_embedding(pos_out, label_img=positives, global_step=epoch, tag="pos_out")
             # writer.add_embedding(neg_out, label_img=negatives, global_step=epoch, tag="neg_out")
@@ -220,6 +121,43 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
+
+            writer.add_histogram("conv1_out", conv1_out, num_iter)
+            writer.add_histogram("conv2_out", conv2_out, num_iter)
+            writer.add_histogram("conv3_out", conv3_out, num_iter)
+            # writer.add_histogram("conv4_out", conv4_out, num_iter)
+
+            writer.add_histogram("conv1_weight", model.conv1[0].weight, num_iter)
+            writer.add_histogram("conv1_weight_diff", model.conv1[0].weight - prev_conv1_weight, num_iter)
+            writer.add_histogram("conv1_grad", model.conv1[0].weight.grad, num_iter)
+
+            writer.add_histogram("conv2_weight", model.conv2[0].weight, num_iter)
+            writer.add_histogram("conv2_weight_diff", model.conv2[0].weight - prev_conv2_weight, num_iter)
+            writer.add_histogram("conv2_grad", model.conv2[0].weight.grad, num_iter)
+
+            writer.add_histogram("conv3_weight", model.conv3[0].weight, num_iter)
+            writer.add_histogram("conv3_weight_diff", model.conv3[0].weight - prev_conv3_weight, num_iter)
+            writer.add_histogram("conv3_grad", model.conv3[0].weight.grad, num_iter)
+
+            writer.add_histogram("conv4_weight", model.conv4[0].weight, num_iter)
+            writer.add_histogram("conv4_weight_diff", model.conv4[0].weight - prev_conv4_weight, num_iter)
+            writer.add_histogram("conv4_grad", model.conv4[0].weight.grad, num_iter)
+
+            # writer.add_histogram("fc_weight", model.fc.weight, num_iter)
+            # writer.add_histogram("fc_weight_diff", model.fc.weight - prev_fc_weight, num_iter)
+            # writer.add_histogram("fc_weight_grad", model.fc.weight.grad, num_iter)
+            #
+            # writer.add_histogram("fc_bias", model.fc.bias, num_iter)
+            # writer.add_histogram("fc_bias_diff", model.fc.bias - prev_fc_bias, num_iter)
+            # writer.add_histogram("fc_bias_grad", model.fc.bias.grad, num_iter)
+
+            prev_conv1_weight = copy.deepcopy(model.conv1[0].weight)
+            prev_conv2_weight = copy.deepcopy(model.conv2[0].weight)
+            prev_conv3_weight = copy.deepcopy(model.conv3[0].weight)
+            prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
+            # prev_fc_weight = copy.deepcopy(model.fc.weight)
+            # prev_fc_bias = copy.deepcopy(model.fc.bias)
+            num_iter += 1
 
             running_loss += loss.item() * anchors.size(0)
             loss_total += anchors.size(0)

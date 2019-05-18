@@ -9,8 +9,8 @@ def triplet_evaluate(device, model, train_batch, test_batch):
     test_batch = test_batch.to(device)
     assert not model.training
     with torch.no_grad():
-        train_embeds = model(train_batch)
-        test_embeds = model(test_batch)
+        train_embeds, *_ = model(train_batch)
+        test_embeds, *_ = model(test_batch)
 
     dist_matrix = torch.stack([F.pairwise_distance(train_embeds, test_embeds[i], p=2)
                                for i in range(test_embeds.size(0))])

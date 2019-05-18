@@ -57,15 +57,17 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # model = models.TripletNet().to(device)
-    # model = models.TripletNetWithFC().to(device)
+    model = models.TripletNetWithFC().to(device)
     # model = models.MetricNet().to(device)
-    model = models.ResnetModel().to(device)
+    # model = models.ResnetModel().to(device)
+    # model = models.BrendenNet().to(device)
+    # model = models.ResiduleNet().to(device)
 
     if torch.cuda.device_count() > 1:
         print("{:d} GPUs are available".format(torch.cuda.device_count()))
         model = nn.DataParallel(model)
 
-    optimiser = optim.Adam(model.parameters())
+    optimiser = optim.Adam(model.parameters(), lr=5e-3)
     scheduler = optim.lr_scheduler.ExponentialLR(optimiser, gamma=0.95)
     criterion = losses.SlideLoss()
 
