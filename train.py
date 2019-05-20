@@ -91,9 +91,9 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
     prev_conv1_weight = copy.deepcopy(model.conv1[0].weight)
     prev_conv2_weight = copy.deepcopy(model.conv2[0].weight)
     prev_conv3_weight = copy.deepcopy(model.conv3[0].weight)
-    prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
-    # prev_fc_weight = copy.deepcopy(model.fc.weight)
-    # prev_fc_bias = copy.deepcopy(model.fc.bias)
+    # prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
+    prev_fc_weight = copy.deepcopy(model.fc.weight)
+    prev_fc_bias = copy.deepcopy(model.fc.bias)
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch + last_epoch, last_epoch + num_epochs - 1))
         print('-' * 10)
@@ -101,6 +101,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
         model.train()
         running_loss = 0.0
         loss_total = 0
+        writer.add_scalar("scale", criterion.scale, epoch)
         for triplet_batch, triplet_labels in tqdm.tqdm(triplet_dataloaders["train"], desc="Triplet Batches"):
             triplet_batch = torch.reshape(triplet_batch, (-1, 3, *triplet_batch.size()[1:]))
             anchors, positives, negatives = \
@@ -113,7 +114,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             positives = positives.to(device)
             negatives = negatives.to(device)
 
-            loss, *_, conv3_out, conv2_out, conv1_out = model_forward(model, criterion, anchors, positives, negatives)
+            loss, fc_out, *_, conv3_out, conv2_out, conv1_out = model_forward(model, criterion, anchors, positives,
+                                                                              negatives)
             # writer.add_embedding(anc_out, label_img=anchors, global_step=epoch, tag="anc_out")
             # writer.add_embedding(pos_out, label_img=positives, global_step=epoch, tag="pos_out")
             # writer.add_embedding(neg_out, label_img=negatives, global_step=epoch, tag="neg_out")
@@ -126,46 +128,60 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
             writer.add_histogram("conv2_out", conv2_out, num_iter)
             writer.add_histogram("conv3_out", conv3_out, num_iter)
             # writer.add_histogram("conv4_out", conv4_out, num_iter)
+            writer.add_histogram("fc_out", fc_out, num_iter)
 
+            conv1_diff = model.conv1[0].weight - prev_conv1_weight
             writer.add_histogram("conv1_weight", model.conv1[0].weight, num_iter)
-            writer.add_histogram("conv1_weight_diff", model.conv1[0].weight - prev_conv1_weight, num_iter)
+            writer.add_histogram("conv1_weight_diff", conv1_diff, num_iter)
             writer.add_histogram("conv1_grad", model.conv1[0].weight.grad, num_iter)
+            writer.add_scalar("conv1_mean_weight_diff", torch.mean(torch.abs(conv1_diff)), num_iter)
 
+            conv2_diff = model.conv2[0].weight - prev_conv2_weight
             writer.add_histogram("conv2_weight", model.conv2[0].weight, num_iter)
-            writer.add_histogram("conv2_weight_diff", model.conv2[0].weight - prev_conv2_weight, num_iter)
+            writer.add_histogram("conv2_weight_diff", conv2_diff, num_iter)
             writer.add_histogram("conv2_grad", model.conv2[0].weight.grad, num_iter)
+            writer.add_scalar("conv2_mean_weight_diff", torch.mean(torch.abs(conv2_diff)), num_iter)
 
+            conv3_diff = model.conv3[0].weight - prev_conv3_weight
             writer.add_histogram("conv3_weight", model.conv3[0].weight, num_iter)
-            writer.add_histogram("conv3_weight_diff", model.conv3[0].weight - prev_conv3_weight, num_iter)
+            writer.add_histogram("conv3_weight_diff", conv3_diff, num_iter)
             writer.add_histogram("conv3_grad", model.conv3[0].weight.grad, num_iter)
+            writer.add_scalar("conv3_mean_weight_diff", torch.mean(torch.abs(conv3_diff)), num_iter)
 
-            writer.add_histogram("conv4_weight", model.conv4[0].weight, num_iter)
-            writer.add_histogram("conv4_weight_diff", model.conv4[0].weight - prev_conv4_weight, num_iter)
-            writer.add_histogram("conv4_grad", model.conv4[0].weight.grad, num_iter)
+            # writer.add_histogram("conv4_weight", model.conv4[0].weight, num_iter)
+            # writer.add_histogram("conv4_weight_diff", model.conv4[0].weight - prev_conv4_weight, num_iter)
+            # writer.add_histogram("conv4_grad", model.conv4[0].weight.grad, num_iter)
 
-            # writer.add_histogram("fc_weight", model.fc.weight, num_iter)
-            # writer.add_histogram("fc_weight_diff", model.fc.weight - prev_fc_weight, num_iter)
-            # writer.add_histogram("fc_weight_grad", model.fc.weight.grad, num_iter)
-            #
-            # writer.add_histogram("fc_bias", model.fc.bias, num_iter)
-            # writer.add_histogram("fc_bias_diff", model.fc.bias - prev_fc_bias, num_iter)
-            # writer.add_histogram("fc_bias_grad", model.fc.bias.grad, num_iter)
+            fc_diff = model.fc.weight - prev_fc_weight
+            writer.add_histogram("fc_weight", model.fc.weight, num_iter)
+            writer.add_histogram("fc_weight_diff", fc_diff, num_iter)
+            writer.add_histogram("fc_weight_grad", model.fc.weight.grad, num_iter)
+            writer.add_scalar("fc_mean_weight_diff", torch.mean(torch.abs(fc_diff)), num_iter)
+
+            bias_diff = model.fc.bias - prev_fc_bias
+            writer.add_histogram("fc_bias", model.fc.bias, num_iter)
+            writer.add_histogram("fc_bias_diff", bias_diff, num_iter)
+            writer.add_histogram("fc_bias_grad", model.fc.bias.grad, num_iter)
+            writer.add_scalar("bias_mean_weight_diff", torch.mean(torch.abs(bias_diff)), num_iter)
 
             prev_conv1_weight = copy.deepcopy(model.conv1[0].weight)
             prev_conv2_weight = copy.deepcopy(model.conv2[0].weight)
             prev_conv3_weight = copy.deepcopy(model.conv3[0].weight)
-            prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
-            # prev_fc_weight = copy.deepcopy(model.fc.weight)
-            # prev_fc_bias = copy.deepcopy(model.fc.bias)
+            # prev_conv4_weight = copy.deepcopy(model.conv4[0].weight)
+            prev_fc_weight = copy.deepcopy(model.fc.weight)
+            prev_fc_bias = copy.deepcopy(model.fc.bias)
             num_iter += 1
 
             running_loss += loss.item() * anchors.size(0)
             loss_total += anchors.size(0)
 
         epoch_loss = running_loss / loss_total
-        print("Train Loss: {:.4f}".format(epoch_loss))
-        epoch_losses["train"].append(epoch_loss)
-        writer.add_scalar("train_loss", epoch_loss, epoch)
+        scaled_epoch_loss = epoch_loss / criterion.scale
+        print("Train Loss: {:.4f}".format(scaled_epoch_loss))
+        epoch_losses["train"].append(scaled_epoch_loss)
+        writer.add_scalar("train_loss", scaled_epoch_loss, epoch)
+
+        criterion.step(epoch_loss)
 
         model.eval()
         running_err = 0.0
@@ -182,7 +198,7 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
         epoch_err = running_err / err_total
         print("Val Error: {:.4f}".format(epoch_err))
         epoch_errors["val"].append(epoch_err)
-        writer.add_scalar("val_error", epoch_err, epoch)
+        # writer.add_scalar("val_error", epoch_err, epoch)
 
         if epoch_err < best_val_err:
             best_val_err = epoch_err
@@ -191,7 +207,8 @@ def train_model(device, triplet_dataloaders, pair_dataloaders,
 
         err = eval.evaluate_all(device, model, eval_forward, prefix="all_runs")
         print("Eval Error: {:.4f}".format(err))
-        writer.add_scalar("eval_error", err, epoch)
+        # writer.add_scalar("eval_error", err, epoch)
+        writer.add_scalars("Error", {"Val": epoch_err, "Eval": err}, global_step=epoch)
         # scheduler.step()
 
     time_elapsed = time.time() - since

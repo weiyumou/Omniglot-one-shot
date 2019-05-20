@@ -58,27 +58,27 @@ class TripletNetWithFC(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=64,
+                      kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(num_features=64),
+            nn.PReLU(num_parameters=64),
+            nn.MaxPool2d(kernel_size=2)
+        )
+        self.conv3 = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=128,
                       kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(num_features=128),
             nn.PReLU(num_parameters=128),
             nn.MaxPool2d(kernel_size=2)
         )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=128, out_channels=256,
-                      kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256),
-            nn.PReLU(num_parameters=256),
-            nn.MaxPool2d(kernel_size=2)
-        )
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=256, out_channels=256,
-                      kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256),
-            nn.PReLU(num_parameters=256),
-            nn.MaxPool2d(kernel_size=2)
-        )
-        # self.fc = nn.Linear(in_features=128 * 3 * 3, out_features=256)
+        # self.conv4 = nn.Sequential(
+        #     nn.Conv2d(in_channels=64, out_channels=64,
+        #               kernel_size=3, padding=1, bias=False),
+        #     nn.BatchNorm2d(num_features=64),
+        #     nn.PReLU(num_parameters=64),
+        #     nn.MaxPool2d(kernel_size=2)
+        # )
+        self.fc = nn.Linear(in_features=128 * 3 * 3, out_features=128)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -94,10 +94,10 @@ class TripletNetWithFC(nn.Module):
         conv1_out = self.conv1(x)
         conv2_out = self.conv2(conv1_out)
         conv3_out = self.conv3(conv2_out)
-        conv4_out = self.conv4(conv3_out)
-        conv4_out = conv4_out.reshape(conv4_out.size(0), -1)
-        # fc_out = self.fc(conv3_out)
-        return conv4_out, conv3_out, conv2_out, conv1_out
+        # conv4_out = self.conv4(conv3_out)
+        conv3_out = conv3_out.reshape(conv3_out.size(0), -1)
+        fc_out = self.fc(conv3_out)
+        return fc_out, conv3_out, conv2_out, conv1_out
 
 
 class MetricNet(nn.Module):
