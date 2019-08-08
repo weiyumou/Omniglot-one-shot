@@ -93,8 +93,8 @@ if __name__ == '__main__':
                                                     args.log_dir, args.num_epochs, model,
                                                     train.triplet_model_forward, eval.triplet_evaluate,
                                                     model_id=args.model_id)
-    avg_err = eval.evaluate_all(device, model, eval.triplet_evaluate, prefix=args.eval_dir,
-                                model_id=args.model_id, model_dir=args.model_dir)
+    avg_err, _ = eval.evaluate_all(device, model, eval.triplet_evaluate, prefix=args.eval_dir,
+                                   model_id=args.model_id, model_dir=args.model_dir)
 
     print("Average Error Rate: {:.4f}".format(avg_err))
 

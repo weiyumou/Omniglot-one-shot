@@ -17,4 +17,4 @@ class SlideLoss(nn.Module):
         return torch.mean(diff)
 
     def step(self, epoch_loss: float):
-        self.scale = math.exp(self.scale / epoch_loss) * self.scale / epoch_loss
+        self.scale = max(self.scale, math.exp(self.scale / epoch_loss) * self.scale / epoch_loss)

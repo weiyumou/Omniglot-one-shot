@@ -74,13 +74,15 @@ def evaluate_all(device, model, eval_forward, model_id=None,
 
     model.eval()
     error = 0.0
+    run_errors = []
     for run in range(num_runs):
         folder = "run" + str(run + 1).zfill(2)
         train_batch, test_batch = load_eval_images(folder, prefix)
         err = eval_forward(device, model, train_batch, test_batch)
+        run_errors.append(err)
         print("Run #{:d} Error Rate: {:.4f}".format(run, err))
         error += err
-    return error / num_runs
+    return error / num_runs, run_errors
 
 
 def calc_dist_matrix(train_embeds, test_embeds):

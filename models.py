@@ -58,14 +58,14 @@ class TripletNetWithFC(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64,
+            nn.Conv2d(in_channels=64, out_channels=128,
                       kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=64),
-            nn.PReLU(num_parameters=64),
+            nn.BatchNorm2d(num_features=128),
+            nn.PReLU(num_parameters=128),
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=128,
+            nn.Conv2d(in_channels=128, out_channels=128,
                       kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(num_features=128),
             nn.PReLU(num_parameters=128),
@@ -78,7 +78,7 @@ class TripletNetWithFC(nn.Module):
         #     nn.PReLU(num_parameters=64),
         #     nn.MaxPool2d(kernel_size=2)
         # )
-        self.fc = nn.Linear(in_features=128 * 3 * 3, out_features=128)
+        self.fc = nn.Linear(in_features=128 * 3 * 3, out_features=2048)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
